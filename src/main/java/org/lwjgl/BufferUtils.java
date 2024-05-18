@@ -100,15 +100,10 @@ public class BufferUtils {
     //Wrote my own implementation since JNI isn't supported in TeaVM
     //I'm not sure if this even works as intended
     private static void zeroBuffer0(Buffer b, long offset, long length) {
-        if (b instanceof ByteBuffer) {
-            ((ByteBuffer) b).position((int) offset);
-            ((ByteBuffer) b).limit((int) (offset + length));
-            ((ByteBuffer) b).put(new byte[(int) length]);
-        } else {
-            for (long i = offset; i < offset + length; i++) {
-                ((ByteBuffer) b).put((int) i, (byte) 0); //Probably very unsafe
-            }
-        }
+    	for (int i = 0; i < b.remaining(); i++) {
+    		//Casting the buffers probably isn't the best way to do this
+    		((ByteBuffer)b).put(i, (byte) 0);
+    	}
     }
 
     //Not in BufferUtils but thought I would add it anyways
