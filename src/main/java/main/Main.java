@@ -1,5 +1,26 @@
 package main;
 
+import org.lwjgl.util.vector.*;
+
+import java.nio.FloatBuffer;
+
+import org.lwjgl.LWJGLException;
+import org.lwjgl.opengl.GL11;
+import org.teavm.jso.JSBody;
+import org.teavm.jso.JSObject;
+import org.teavm.jso.browser.Window;
+import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import org.teavm.jso.dom.html.HTMLCanvasElement;
+import org.teavm.jso.dom.html.HTMLDocument;
+import org.teavm.jso.dom.html.HTMLElement;
+import org.teavm.jso.webgl.WebGLBuffer;
+import org.teavm.jso.webgl.WebGLFramebuffer;
+import org.teavm.jso.webgl.WebGLProgram;
+import org.teavm.jso.webgl.WebGLRenderbuffer;
+import org.teavm.jso.webgl.WebGLRenderingContext;
+import org.teavm.jso.webgl.WebGLTexture;
+import org.teavm.jso.webgl.WebGLUniformLocation;
+
 public class Main {
 
     // copyright (c) 2020-2023 lax1dude
@@ -1038,5 +1059,458 @@ public class Main {
 	}
 	
 	public interface WebGLVertexArray extends JSObject {
+	}
+	
+	public static final class TextureGL { 
+		public final WebGLTexture obj;
+		public int w = -1;
+		public int h = -1;
+		public boolean nearest = true;
+		public boolean anisotropic = false;
+		public TextureGL(WebGLTexture obj) { 
+			this.obj = obj; 
+		} 
+	} 
+	public static final class BufferGL { 
+		public final WebGLBuffer obj; 
+		public BufferGL(WebGLBuffer obj) { 
+			this.obj = obj; 
+		} 
+	} 
+	public static final class ShaderGL { 
+		public final org.teavm.jso.webgl.WebGLShader obj; 
+		public ShaderGL(org.teavm.jso.webgl.WebGLShader webGLShader) { 
+			this.obj = webGLShader; 
+		} 
+	}
+	private static int progId = 0;
+	public static final class ProgramGL { 
+		public final WebGLProgram obj; 
+		public final int hashcode; 
+		public ProgramGL(WebGLProgram obj) { 
+			this.obj = obj; 
+			this.hashcode = ++progId;
+		} 
+	} 
+	public static final class UniformGL { 
+		public final WebGLUniformLocation obj; 
+		public UniformGL(WebGLUniformLocation obj) { 
+			this.obj = obj; 
+		} 
+	} 
+	public static final class BufferArrayGL { 
+		public final WebGLVertexArray obj; 
+		public boolean isQuadBufferBound; 
+		public BufferArrayGL(WebGLVertexArray obj) { 
+			this.obj = obj; 
+			this.isQuadBufferBound = false; 
+		} 
+	} 
+	public static final class FramebufferGL { 
+		public final WebGLFramebuffer obj; 
+		public FramebufferGL(WebGLFramebuffer obj) { 
+			this.obj = obj; 
+		} 
+	} 
+	public static final class RenderbufferGL { 
+		public final WebGLRenderbuffer obj; 
+		public RenderbufferGL(WebGLRenderbuffer obj) { 
+			this.obj = obj; 
+		} 
+	} 
+	public static final class QueryGL { 
+		public final WebGLQuery obj; 
+		public QueryGL(WebGLQuery obj) { 
+			this.obj = obj; 
+		} 
+	}
+	
+	// credit to lax1dude for the original code
+	// (some changes have been made to vector functions)
+	public static class WebGLShader {
+
+		private static final WebGLShader[] instances = new WebGLShader[128];
+		
+		private static String shader = null;
+
+		public static void refreshCoreGL() {
+			for (int i = 0; i < instances.length; ++i) {
+				if (instances[i] != null) {
+					GL11.glDeleteProgram(instances[i].globject);
+					instances[i] = null;
+				}
+			}
+			shader = null;
+		}
+
+		public static final int COLOR = 1;
+		public static final int NORMAL = 2;
+		public static final int TEXTURE0 = 4;
+		public static final int LIGHTING = 8;
+		public static final int FOG = 16;
+		public static final int ALPHATEST = 32;
+		public static final int UNIT0 = 64;
+
+		public static WebGLShader instance(int i) {
+			WebGLShader s = instances[i];
+			if (s == null) {
+				boolean CC_a_color = false;
+				boolean CC_a_normal = false;
+				boolean CC_a_texture0 = false;
+				boolean CC_lighting = false;
+				boolean CC_fog = false;
+				boolean CC_alphatest = false;
+				boolean CC_unit0 = false;
+				if ((i & COLOR) == COLOR) {
+					CC_a_color = true;
+				}
+				if ((i & NORMAL) == NORMAL) {
+					CC_a_normal = true;
+				}
+				if ((i & TEXTURE0) == TEXTURE0) {
+					CC_a_texture0 = true;
+				}
+				if ((i & LIGHTING) == LIGHTING) {
+					CC_lighting = true;
+				}
+				if ((i & FOG) == FOG) {
+					CC_fog = true;
+				}
+				if ((i & ALPHATEST) == ALPHATEST) {
+					CC_alphatest = true;
+				}
+				if ((i & UNIT0) == UNIT0) {
+					CC_unit0 = true;
+				}
+				s = new WebGLShader(i, CC_a_color, CC_a_normal, CC_a_texture0, CC_lighting, CC_fog, CC_alphatest, CC_unit0);
+				instances[i] = s;
+			}
+			return s;
+		}
+
+		private final boolean enable_color;
+		private final boolean enable_normal;
+		private final boolean enable_texture0;
+		private final boolean enable_lighting;
+		private final boolean enable_fog;
+		private final boolean enable_alphatest;
+		private final boolean enable_unit0;
+		private final ProgramGL globject;
+
+		private UniformGL u_matrix_m = null;
+		private UniformGL u_matrix_p = null;
+		private UniformGL u_matrix_t = null;
+
+		private UniformGL u_fogColor = null;
+		private UniformGL u_fogMode = null;
+		private UniformGL u_fogStart = null;
+		private UniformGL u_fogEnd = null;
+		private UniformGL u_fogDensity = null;
+		private UniformGL u_fogPremultiply = null;
+
+		private UniformGL u_colorUniform = null;
+		private UniformGL u_normalUniform = null;
+
+		private UniformGL u_alphaTestF = null;
+
+		private UniformGL u_texCoordV0 = null;
+
+		private UniformGL u_light0Pos = null;
+		private UniformGL u_light1Pos = null;
+
+		private final int a_position;
+		private final int a_texture0;
+		private final int a_color;
+		private final int a_normal;
+
+		public final BufferArrayGL genericArray;
+		public final BufferGL genericBuffer;
+		public boolean bufferIsInitialized = false;
+
+		private WebGLShader(int j, boolean CC_a_color, boolean CC_a_normal, boolean CC_a_texture0,
+				boolean CC_lighting, boolean CC_fog, boolean CC_alphatest, boolean CC_unit0) {
+			enable_color = CC_a_color;
+			enable_normal = CC_a_normal;
+			enable_texture0 = CC_a_texture0;
+			enable_lighting = CC_lighting;
+			enable_fog = CC_fog;
+			enable_alphatest = CC_alphatest;
+			enable_unit0 = CC_unit0;
+
+			if (shader == null) {
+				shader = new String(vertexFragmentShader);
+			}
+
+			String source = "";
+			if (enable_color)
+				source += "\n#define CC_a_color\n";
+			if (enable_normal)
+				source += "#define CC_a_normal\n";
+			if (enable_texture0)
+				source += "#define CC_a_texture0\n";
+			if (enable_lighting)
+				source += "#define CC_lighting\n";
+			if (enable_fog)
+				source += "#define CC_fog\n";
+			if (enable_alphatest)
+				source += "#define CC_alphatest\n";
+			if (enable_unit0)
+				source += "#define CC_unit0\n";
+			source += shader;
+
+			ShaderGL v = GL11.glCreateShader(GL11.GL_VERTEX_SHADER);
+			GL11.glShaderSource(v, GL11.glGetShaderHeader() + "\n#define CC_VERT\n" + source);
+			GL11.glCompileShader(v);
+
+			if (!GL11.glGetShaderCompiled(v)) {
+				System.err.println(("\n\n" + GL11.glGetShaderInfoLog(v)).replace("\n", "\n[main.Main.vertexFragmentShader][CC_VERT] "));
+				throw new RuntimeException("broken shader source");
+			}
+
+			ShaderGL f = GL11.glCreateShader(GL11.GL_FRAGMENT_SHADER);
+			GL11.glShaderSource(f, GL11.glGetShaderHeader() + "\n#define CC_FRAG\n" + source);
+			GL11.glCompileShader(f);
+
+			if (!GL11.glGetShaderCompiled(f)) {
+				System.err.println(("\n\n" + GL11.glGetShaderInfoLog(f)).replace("\n", "\n[main.Main.vertexFragmentShader][CC_FRAG] "));
+				throw new RuntimeException("broken shader source");
+			}
+
+			globject = GL11.glCreateProgram();
+			GL11.glAttachShader(globject, v);
+			GL11.glAttachShader(globject, f);
+
+			int i = 0;
+			a_position = i++;
+			GL11.glBindAttributeLocation(globject, a_position, "a_position");
+
+			if (enable_texture0) {
+				a_texture0 = i++;
+				GL11.glBindAttributeLocation(globject, a_texture0, "a_texture0");
+			} else {
+				a_texture0 = -1;
+			}
+			if (enable_color) {
+				a_color = i++;
+				GL11.glBindAttributeLocation(globject, a_color, "a_color");
+			} else {
+				a_color = -1;
+			}
+			if (enable_normal) {
+				a_normal = i++;
+				GL11.glBindAttributeLocation(globject, a_normal, "a_normal");
+			} else {
+				a_normal = -1;
+			}
+
+			GL11.glLinkProgram(globject);
+
+			GL11.glDetachShader(globject, v);
+			GL11.glDetachShader(globject, f);
+			GL11.glDeleteShader(v);
+			GL11.glDeleteShader(f);
+
+			if (!GL11.glGetProgramLinked(globject)) {
+				System.err.println(("\n\n" + GL11.glGetProgramInfoLog(globject)).replace("\n", "\n[LINKER] "));
+				throw new RuntimeException("broken shader source");
+			}
+
+			GL11.glUseProgram(globject);
+
+			u_matrix_m = GL11.glGetUniformLocation(globject, "matrix_m");
+			u_matrix_p = GL11.glGetUniformLocation(globject, "matrix_p");
+			u_matrix_t = GL11.glGetUniformLocation(globject, "matrix_t");
+
+			u_colorUniform = GL11.glGetUniformLocation(globject, "colorUniform");
+
+			if (enable_lighting) {
+				u_normalUniform = GL11.glGetUniformLocation(globject, "normalUniform");
+				u_light0Pos = GL11.glGetUniformLocation(globject, "light0Pos");
+				u_light1Pos = GL11.glGetUniformLocation(globject, "light1Pos");
+			}
+
+			if (enable_fog) {
+				u_fogColor = GL11.glGetUniformLocation(globject, "fogColor");
+				u_fogMode = GL11.glGetUniformLocation(globject, "fogMode");
+				u_fogStart = GL11.glGetUniformLocation(globject, "fogStart");
+				u_fogEnd = GL11.glGetUniformLocation(globject, "fogEnd");
+				u_fogDensity = GL11.glGetUniformLocation(globject, "fogDensity");
+				u_fogPremultiply = GL11.glGetUniformLocation(globject, "fogPremultiply");
+			}
+
+			if (enable_alphatest) {
+				u_alphaTestF = GL11.glGetUniformLocation(globject, "alphaTestF");
+			}
+
+			GL11.glUniform1i(GL11.glGetUniformLocation(globject, "tex0"), 0);
+			u_texCoordV0 = GL11.glGetUniformLocation(globject, "texCoordV0");
+
+			genericArray = GL11.glCreateVertexArray();
+			genericBuffer = GL11.glCreateBuffer();
+			GL11.glBindVertexArray(genericArray);
+			GL11.glBindBuffer(GL11.GL_ARRAY_BUFFER, genericBuffer);
+			setupArrayForProgram();
+
+		}
+
+		public void setupArrayForProgram() {
+			GL11.glEnableVertexAttribArray(a_position);
+			GL11.glVertexAttribPointer(a_position, 3, GL11.GL_FLOAT, false, 28, 0);
+			if (enable_texture0) {
+				GL11.glEnableVertexAttribArray(a_texture0);
+				GL11.glVertexAttribPointer(a_texture0, 2, GL11.GL_FLOAT, false, 28, 12);
+			}
+			if (enable_color) {
+				GL11.glEnableVertexAttribArray(a_color);
+				GL11.glVertexAttribPointer(a_color, 4, GL11.GL_UNSIGNED_BYTE, true, 28, 20);
+			}
+			if (enable_normal) {
+				GL11.glEnableVertexAttribArray(a_normal);
+				GL11.glVertexAttribPointer(a_normal, 4, GL11.GL_UNSIGNED_BYTE, true, 28, 24);
+			}
+		}
+
+		public void use() {
+			GL11.glUseProgram(globject);
+		}
+
+		public void unuse() {
+
+		}
+
+		private FloatBuffer modelBuffer = FloatBuffer.wrap(new float[16]);
+		private FloatBuffer projectionBuffer = FloatBuffer.wrap(new float[16]);
+		private FloatBuffer textureBuffer = FloatBuffer.wrap(new float[16]);
+
+		private Matrix4f modelMatrix = (Matrix4f) new Matrix4f().setZero();
+		private Matrix4f projectionMatrix = (Matrix4f) new Matrix4f().setZero();
+		private Matrix4f textureMatrix = (Matrix4f) new Matrix4f().setZero();
+		private Vector4f light0Pos = new Vector4f();
+		private Vector4f light1Pos = new Vector4f();
+
+		public void modelMatrix(Matrix4f mat) {
+			if (!mat.equals(modelMatrix)) {
+				modelMatrix.load(mat).store(modelBuffer);
+				GL11.glUniformMat4fv(u_matrix_m, modelBuffer.array());
+			}
+		}
+
+		public void projectionMatrix(Matrix4f mat) {
+			if (!mat.equals(projectionMatrix)) {
+				projectionMatrix.load(mat).store(projectionBuffer);
+				GL11.glUniformMat4fv(u_matrix_p, projectionBuffer.array());
+			}
+		}
+
+		public void textureMatrix(Matrix4f mat) {
+			if (!mat.equals(textureMatrix)) {
+				textureMatrix.load(mat).store(textureBuffer);
+				GL11.glUniformMat4fv(u_matrix_t, textureBuffer.array());
+			}
+		}
+
+		public void lightPositions(Vector4f pos0, Vector4f pos1) {
+			if (!pos0.equals(light0Pos) || !pos1.equals(light1Pos)) {
+				light0Pos.set(pos0);
+				light1Pos.set(pos1);
+				GL11.glUniform3f(u_light0Pos, light0Pos.x, light0Pos.y, light0Pos.z);
+				GL11.glUniform3f(u_light1Pos, light1Pos.x, light1Pos.y, light1Pos.z);
+			}
+		}
+
+		private int fogMode = 0;
+
+		public void fogMode(int mode) {
+			if (fogMode != mode) {
+				fogMode = mode;
+				GL11.glUniform1i(u_fogMode, mode % 2);
+				GL11.glUniform1f(u_fogPremultiply, mode / 2);
+			}
+		}
+
+		private float fogColorR = 0.0f;
+		private float fogColorG = 0.0f;
+		private float fogColorB = 0.0f;
+		private float fogColorA = 0.0f;
+
+		public void fogColor(float r, float g, float b, float a) {
+			if (fogColorR != r || fogColorG != g || fogColorB != b || fogColorA != a) {
+				fogColorR = r;
+				fogColorG = g;
+				fogColorB = b;
+				fogColorA = a;
+				GL11.glUniform4f(u_fogColor, fogColorR, fogColorG, fogColorB, fogColorA);
+			}
+		}
+
+		private float fogStart = 0.0f;
+		private float fogEnd = 0.0f;
+
+		public void fogStartEnd(float s, float e) {
+			if (fogStart != s || fogEnd != e) {
+				fogStart = s;
+				fogEnd = e;
+				GL11.glUniform1f(u_fogStart, fogStart);
+				GL11.glUniform1f(u_fogEnd, fogEnd);
+			}
+		}
+
+		private float fogDensity = 0.0f;
+
+		public void fogDensity(float d) {
+			if (fogDensity != d) {
+				fogDensity = d;
+				GL11.glUniform1f(u_fogDensity, fogDensity);
+			}
+		}
+
+		private float alphaTestValue = 0.0f;
+
+		public void alphaTest(float limit) {
+			if (alphaTestValue != limit) {
+				alphaTestValue = limit;
+				GL11.glUniform1f(u_alphaTestF, alphaTestValue);
+			}
+		}
+
+		private float tex0x = 0.0f;
+		private float tex0y = 0.0f;
+
+		public void tex0Coords(float x, float y) {
+			if (tex0x != x || tex0y != y) {
+				tex0x = x;
+				tex0y = y;
+				GL11.glUniform2f(u_texCoordV0, tex0x, tex0y);
+			}
+		}
+
+		private float colorUniformR = 0.0f;
+		private float colorUniformG = 0.0f;
+		private float colorUniformB = 0.0f;
+		private float colorUniformA = 0.0f;
+
+		public void color(float r, float g, float b, float a) {
+			if (colorUniformR != r || colorUniformG != g || colorUniformB != b || colorUniformA != a) {
+				colorUniformR = r;
+				colorUniformG = g;
+				colorUniformB = b;
+				colorUniformA = a;
+				GL11.glUniform4f(u_colorUniform, colorUniformR, colorUniformG, colorUniformB, colorUniformA);
+			}
+		}
+
+		private float normalUniformX = 0.0f;
+		private float normalUniformY = 0.0f;
+		private float normalUniformZ = 0.0f;
+
+		public void normal(float x, float y, float z) {
+			if (normalUniformX != x || normalUniformY != y || normalUniformZ != z) {
+				normalUniformX = x;
+				normalUniformY = y;
+				normalUniformZ = z;
+				GL11.glUniform3f(u_normalUniform, normalUniformX, normalUniformY, normalUniformZ);
+			}
+		}
+
 	}
 }
