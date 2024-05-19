@@ -142,9 +142,49 @@ public class Main {
     "#endif\n" +
     "";
 
-    public static void main(String args[]) {
-
-    }
+    public static HTMLDocument document = null;
+	public static HTMLElement parent = null;
+	public static HTMLCanvasElement canvas = null;
+	public static CanvasRenderingContext2D canvasContext = null;
+	public static HTMLCanvasElement canvasBack = null;
+	public static WebGL2RenderingContext webgl = null;
+	public static Window window = null;
+	
+	private static int width = 0;
+	private static int height = 0;
+	
+	public static void main(String args[]) throws LWJGLException{
+		window = Window.current();
+		document = window.getDocument();
+		parent = document.getBody();
+		
+		String s = parent.getAttribute("style");
+		parent.setAttribute("style", (s == null ? "" : s)+"overflow-x:hidden;overflow-y:hidden;");
+		
+		canvas = (HTMLCanvasElement)document.createElement("canvas");
+		width = parent.getClientWidth();
+		height = parent.getClientHeight();
+		canvas.setWidth(width);
+		canvas.setHeight(height);
+		canvasContext = (CanvasRenderingContext2D) canvas.getContext("2d");
+		parent.appendChild(canvas);
+		canvasBack = (HTMLCanvasElement)document.createElement("canvas");
+		canvasBack.setWidth(width);
+		canvasBack.setHeight(height);
+		webgl = (WebGL2RenderingContext) canvasBack.getContext("webgl2", WebGLConfig());
+		if(webgl == null) {
+			throw new LWJGLException("WebGL 2.0 is not supported in your browser :(");
+		}
+		setCurrentContext(webgl);
+		
+		webgl.getExtension("EXT_texture_filter_anisotropic");
+	}
+	
+	@JSBody(params = { }, script = "return {antialias: false, depth: true, powerPreference: \"high-performance\", desynchronized: false, preserveDrawingBuffer: false, premultipliedAlpha: false, alpha: false};")
+	public static native JSObject WebGLConfig();
+	
+	@JSBody(params = { "obj" }, script = "window.currentContext = obj;")
+	private static native int setCurrentContext(JSObject obj);
 
     public static class GLEnums {
         public static final int GL_ACCUM = 256;
@@ -954,4 +994,49 @@ public class Main {
 		public static final int GL_TEXTURE_MAX_ANISOTROPY = 34046;
 		public static final int GL_CONTEXT_LOST_WEBGL = -100;
     }
+
+	public interface WebGL2RenderingContext extends WebGLRenderingContext {
+		
+	    int TEXTURE_MAX_LEVEL              = 0x0000813D;
+	    int TEXTURE_MAX_ANISOTROPY_EXT     = 0x000084FE;
+	    int UNSIGNED_INT_24_8              = 0x000084FA;
+		int ANY_SAMPLES_PASSED             = 0x00008D6A; 
+		int QUERY_RESULT                   = 0x00008866;
+		int QUERY_RESULT_AVAILABLE         = 0x00008867;
+		int DEPTH24_STENCIL8               = 0x000088F0;
+		int DEPTH_COMPONENT32F             = 0x00008CAC;
+		int READ_FRAMEBUFFER               = 0x00008CA8;
+		int DRAW_FRAMEBUFFER               = 0x00008CA9;
+		int RGB8                           = 0x00008051;
+		int RGBA8                          = 0x00008058;
+		
+		WebGLQuery createQuery();
+
+		void beginQuery(int p1, WebGLQuery obj);
+
+		void endQuery(int p1);
+
+		void deleteQuery(WebGLQuery obj);
+
+		int getQueryParameter(WebGLQuery obj, int p2);
+
+		WebGLVertexArray createVertexArray();
+
+		void deleteVertexArray(WebGLVertexArray obj);  
+
+		void bindVertexArray(WebGLVertexArray obj); 
+		
+		void renderbufferStorageMultisample(int p1, int p2, int p3, int p4, int p5);
+		
+		void blitFramebuffer(int p1, int p2, int p3, int p4, int p5, int p6, int p7, int p8, int p9, int p10);
+		
+		void drawBuffers(int[] p1);
+	    
+	}
+	
+	public interface WebGLQuery extends JSObject {
+	}
+	
+	public interface WebGLVertexArray extends JSObject {
+	}
 }
