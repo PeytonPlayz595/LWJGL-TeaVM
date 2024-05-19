@@ -1,3 +1,5 @@
+package main;
+
 public class Main {
 
     // copyright (c) 2020-2023 lax1dude
