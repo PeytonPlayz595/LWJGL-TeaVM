@@ -2,5 +2,5 @@ package org.lwjgl.opengl;
 
 import main.Main;
 
-public class GL21 extends Main.GLEnums {
+public class GL21 extends GL11 {
 }
