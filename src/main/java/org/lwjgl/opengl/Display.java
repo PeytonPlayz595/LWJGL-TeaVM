@@ -26,7 +26,7 @@ public class Display {
 	private static String title = "Game";
 	
 	private static boolean fullscreen = false;
-	private static int swapInterval;
+	private static int swapInterval = 0;
 	
 	private static final boolean windowCreated = true; //Always true
 	private static boolean windowResized = false;
@@ -90,9 +90,11 @@ public class Display {
 	}
 	
 	private static void createWindow() throws LWJGLException {
-		double ratio = Main.window.getDevicePixelRatio();
-		width = (int)(Main.canvas.getClientWidth() * ratio);
-		height = (int)(Main.canvas.getClientHeight() * ratio);
+		//double ratio = Main.window.getDevicePixelRatio();
+		//width = (int)(Main.canvas.getClientWidth() * ratio);
+		//height = (int)(Main.canvas.getClientHeight() * ratio);
+		width = Main.canvas.getWidth();
+		height = Main.canvas.getHeight();
 		setTitle(title);
 		update();
 	}
@@ -162,6 +164,9 @@ public class Display {
 	}
 	
 	public static void setTitle(String newTitle) {
+		if(newTitle == null) {
+			return;
+		}
 		title = newTitle;
 	}
 	
@@ -182,10 +187,12 @@ public class Display {
 		setCurrentContext(Main.webgl);
 		Main.canvasContext.drawImage(Main.canvasBack, 0.0D, 0.0D, Main.canvas.getWidth(), Main.canvas.getHeight());
 		
-		double ratio = Main.window.getDevicePixelRatio();
-		int w = (int)(Main.canvas.getClientWidth() * ratio);
-		int h = (int)(Main.canvas.getClientHeight() * ratio);
-		if(Main.canvas.getWidth() != w || Main.canvas.getHeight() != h) {
+		//double ratio = Main.window.getDevicePixelRatio();
+		//int w = (int)(Main.canvas.getClientWidth() * ratio);
+		//int h = (int)(Main.canvas.getClientHeight() * ratio);
+		int w = Main.canvas.getWidth();
+		int h = Main.canvas.getHeight();
+		if(w != width || h != height) {
 			windowResized = true;
 		}
 		if(windowResizable && windowResized) {
@@ -298,6 +305,16 @@ public class Display {
 		}
 
 		return width;
+	}
+	
+	public static void setWidth(int w) {
+		Main.canvas.setWidth(w);
+		width = w;
+	}
+	
+	public static void setHeight(int w) {
+		Main.canvas.setWidth(w);
+		width = w;
 	}
 	
 	public static float getPixelScaleFactor() {
