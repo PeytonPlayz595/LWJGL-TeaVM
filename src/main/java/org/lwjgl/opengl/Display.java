@@ -165,7 +165,7 @@ public class Display {
 	
 	public static void setTitle(String newTitle) {
 		if(newTitle == null) {
-			return;
+			throw new IllegalArgumentException("title cannot be null");
 		}
 		title = newTitle;
 	}
