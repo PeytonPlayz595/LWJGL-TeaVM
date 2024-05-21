@@ -182,6 +182,7 @@ public class Mouse {
 		Main.window.removeEventListener("mousemove", mousemove);
 		Main.window.removeEventListener("wheel", wheel);
 		Main.window.removeEventListener("pointerlockchange", pointerLockChange);
+		mouseEvents.clear();
 	}
 	
 	public static boolean isButtonDown(int button) {

@@ -1126,7 +1126,7 @@ public class Main {
 	}
 	
 	// credit to lax1dude for the original code
-	// (some changes have been made to vector functions)
+	// (changes have been made for it to work with matrix classes)
 	public static class WebGLShader {
 
 		private static final WebGLShader[] instances = new WebGLShader[128];

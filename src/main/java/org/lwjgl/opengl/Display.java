@@ -37,15 +37,32 @@ public class Display {
 	
 	private static JSObject fullscreenQuery = null;
 	
+	private static boolean isWindowActive = true;
+	
 	static EventListener<Event> resizeEvent = new EventListener<Event>() {
+		@Override
 		public void handleEvent(Event evt) {
 			windowResized = true;
+		}
+	};
+	static EventListener<Event> blurEvent = new EventListener<Event>() {
+		@Override
+		public void handleEvent(Event evt) {
+			isWindowActive = false;
+		}
+	};
+	static EventListener<Event> focusEvent = new EventListener<Event>() {
+		@Override
+		public void handleEvent(Event evt) {
+			isWindowActive = true;
 		}
 	};
 	
 	static {
 		fullscreenQuery = fullscreenMediaQuery();
-		Main.canvas.addEventListener("resize", resizeEvent);
+		Main.window.addEventListener("resize", resizeEvent);
+		Main.window.addEventListener("blue", blurEvent);
+		Main.window.addEventListener("focus", focusEvent);
 	}
 	
 	private Display() {
@@ -177,6 +194,14 @@ public class Display {
 	public static void swapBuffers() throws LWJGLException {
 		GL11.glFlush();
 		update();
+	}
+	
+	public static boolean isVisible() {
+		return jsIsVisible();
+	}
+	
+	public static boolean isActive() {
+		return isWindowActive;
 	}
 	
 	public static void update() {
@@ -335,4 +360,7 @@ public class Display {
 	
 	@JSBody(params = { "obj" }, script = "window.currentContext = obj;")
 	private static native int setCurrentContext(JSObject obj);
+	
+	@JSBody(script = "return window.document.visibilityState == \"visible\";")
+	public static native boolean jsIsVisible();
 }
