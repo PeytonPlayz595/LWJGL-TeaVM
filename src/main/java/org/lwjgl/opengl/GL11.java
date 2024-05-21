@@ -1,7 +1,10 @@
 package org.lwjgl.opengl;
 
+import org.lwjgl.util.vector.*;
+
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.HashMap;
 
@@ -37,6 +40,7 @@ public class GL11 extends Main.GLEnums {
 	private static Float32Array tessFloatBuffer;
 	private static boolean isTessDrawing;
 	private static int tessVertexCount;
+	private static int tessDrawMode;
 	private static boolean tessHasTexture;
 	private static boolean tessHasColor;
 	private static boolean tessHasNormals;
@@ -54,6 +58,51 @@ public class GL11 extends Main.GLEnums {
 	private static int vertexDrawn;
 	private static int triangleDrawn;
 	
+	//Fog
+	private static float fogColorR;
+	private static float fogColorG;
+	private static float fogColorB;
+	private static float fogColorA;
+	private static int fogMode;
+	private static boolean fogEnabled;
+	private static boolean fogPremultiply;
+	private static float fogStart;
+	private static float fogEnd;
+	private static float fogDensity;
+	
+	private static boolean texture2D;
+	private static boolean lighting;
+	private static boolean colorMaterial;
+	
+	private static float normalX;
+	private static float normalY;
+	private static float normalZ;
+	private static float tex0X;
+	private static float tex0Y;
+	
+	private static float colorR;
+	private static float colorG;
+	private static float colorB;
+	private static float colorA;
+	
+	//Matrix variables
+	private static int matrixMode;
+	static Matrix4f[] matModelV;
+	static int matModelPointer;
+	static Matrix4f[] matProjV;
+	static int matProjPointer;
+	static Matrix4f[] matTexV;
+	static int matTexPointer;
+	
+	private static final Vector3f matrixVector;
+	
+	private static Matrix4f unprojA;
+	private static Matrix4f unprojB;
+	private static Vector4f unprojC;
+	
+	private static Vector4f lightPos1vec;
+	private static Vector4f lightPos0vec;
+	 
 	public static final void glAlphaFunc(int func, float ref) {
 		//only GL_GREATER is supported so the first param is ignored
 		alphaValue = ref;
@@ -68,7 +117,7 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glScissor(int x, int y, int width, int height) {
-		if(webgl.isEnabled(GL_SCISSOR_TEST)) {
+		if(glIsEnabled(GL_SCISSOR_TEST)) {
 			webgl.scissor(x, y, width, height);
 		}
 	}
@@ -199,7 +248,13 @@ public class GL11 extends Main.GLEnums {
 		}
 	}
 	
+	public static final void glMultiTexCoord2f(int p1, float p2, float p3) {
+		tex0X = p2;
+		tex0Y = p3;
+	}
+	
 	public static final void glBlendFunc(int sFactor, int dFactor) {
+		fogPremultiply = (sFactor == GL_ONE && dFactor == GL_ONE_MINUS_SRC_ALPHA);
 		webgl.blendFunc(sFactor, dFactor);
 	}
 	
@@ -212,13 +267,13 @@ public class GL11 extends Main.GLEnums {
  		webgl.bindTexture(target, t.obj);
 	}
 	
-	//Only GL_QUADS are supported????
 	public static final void glBegin(int mode) {
 		if(isTessDrawing) {
 			glEnd();
 		}
 		isTessDrawing = true;
 		tessVertexCount = 0;
+		tessDrawMode = mode;
 		tessHasTexture = false;
 		tessHasColor = false;
 		tessHasNormals = false;
@@ -242,7 +297,7 @@ public class GL11 extends Main.GLEnums {
 				glEnableClientState(GL_NORMAL_ARRAY);
 			}
 			
-			glDrawArrays(GL_QUADS, GL_POINTS, tessVertexCount, Int32Array.create(tessIntBuffer.getBuffer(), 0, tessVertexCount * 7));
+			glDrawArrays(tessDrawMode, GL_POINTS, tessVertexCount, Int32Array.create(tessIntBuffer.getBuffer(), 0, tessVertexCount * 7));
 			
 			if(tessHasTexture) {
 				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -384,8 +439,316 @@ public class GL11 extends Main.GLEnums {
 		}
 	}
 	
+	public static final void glEnable(int cap) {
+		switch(cap) {
+			case GL_RESCALE_NORMAL:
+				break;
+			case GL_TEXTURE_2D:
+				texture2D = true;
+				break;
+			case GL_LIGHTING:
+				lighting = true;
+				break;
+			case GL_ALPHA_TEST:
+				alpha = true;
+				break;
+			case GL_FOG:
+				fogEnabled = true;
+				break;
+			case GL_COLOR_MATERIAL:
+				colorMaterial = true;
+				break;
+			default:
+				webgl.enable(cap);
+		}
+	}
+	
+	public static final void glDisable(int cap) {
+		switch(cap) {
+			case GL_RESCALE_NORMAL:
+				break;
+			case GL_TEXTURE_2D:
+				texture2D = false;
+				break;
+			case GL_LIGHTING:
+				lighting = false;
+				break;
+			case GL_ALPHA_TEST:
+				alpha = false;
+				break;
+			case GL_FOG:
+				fogEnabled = false;
+				break;
+			case GL_COLOR_MATERIAL:
+				colorMaterial = false;
+				break;
+			default:
+				webgl.disable(cap);
+		}
+	}
+	
+	public static final boolean glIsEnabled(int cap) {
+		switch(cap) {
+			case GL_RESCALE_NORMAL:
+				return false;
+			case GL_TEXTURE_2D:
+				return texture2D;
+			case GL_LIGHTING:
+				return lighting;
+			case GL_ALPHA_TEST:
+				return alpha;
+			case GL_FOG:
+				return fogEnabled;
+			case GL_COLOR_MATERIAL:
+				return colorMaterial;
+			default:
+				return webgl.isEnabled(cap);
+		}
+	}
+	
+	public static final void glNormal3b(byte nx, byte ny, byte nz) {
+		float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		normalX = nx / len;
+		normalY = ny / len;
+		normalZ = nz / len;
+	}
+	
+	public static final void glNormal3f(float nx, float ny, float nz) {
+		float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		normalX = nx / len;
+		normalY = ny / len;
+		normalZ = nz / len;
+	}
+	
+	public static final void glNormal3d(double nx, double ny, double nz) {
+		float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		normalX = (float) (nx / len);
+		normalY = (float) (ny / len);
+		normalZ = (float) (nz / len);
+	}
+	
+	public static final void glNormal3i(int nx, int ny, int nz) {
+		float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		normalX = nx / len;
+		normalY = ny / len;
+		normalZ = nz / len;
+	}
+	
+	public static final void glPixelStoref(int pname, float param) {
+		webgl.pixelStorei(pname, pname);
+	}
+
+	public static final void glPixelStorei(int pname, int param) {
+		webgl.pixelStorei(pname, pname);
+	}
+	
+	public static final void glColor3b(float red, float green, float blue) {
+		colorR = red;
+		colorG = green;
+		colorB = blue;
+		colorA = 1.0f;
+	}
+	
+	public static final void glColor3f(float red, float green, float blue) {
+		colorR = red;
+		colorG = green;
+		colorB = blue;
+		colorA = 1.0f;
+	}
+	
+	public static final void glColor3d(double red, double green, double blue) {
+		colorR = (float) red;
+		colorG = (float) green;
+		colorB = (float) blue;
+		colorA = 1.0f;
+	}
+	
+	public static final void glColor4b(byte red, byte green, byte blue, byte alpha) {
+		colorR = red;
+		colorG = green;
+		colorB = blue;
+		colorA = alpha;
+	}
+	
+	public static final void glColor4f(float red, float green, float blue, float alpha) {
+		colorR = red;
+		colorG = green;
+		colorB = blue;
+		colorA = alpha;
+	}
+	
+	public static final void glColor4d(double red, double green, double blue, double alpha) {
+		colorR = (float) red;
+		colorG = (float) green;
+		colorB = (float) blue;
+		colorA = (float) alpha;
+	}
+	
+	public static final void glColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
+		webgl.colorMask(red, green, blue, alpha);
+	}
+	
 	public static final void glTexParameteri(int target, int pname, int param) {
 		webgl.texParameteri(target, pname, param);
+	}
+	
+	public static final void glMatrixMode(int mode) {
+		matrixMode = mode;
+	}
+
+	private static final Matrix4f getMatrix() {
+		switch (matrixMode) {
+		case GL_MODELVIEW:
+		default:
+			return matModelV[matModelPointer];
+		case GL_PROJECTION:
+			return matProjV[matProjPointer];
+		case GL_TEXTURE:
+			return matTexV[matTexPointer];
+		}
+	}
+	
+	public static final void glLoadIdentity() {
+		getMatrix().setIdentity();
+	}
+	
+	public static final void glOrtho(float left, float right, float bottom, float top, float zNear, float zFar) {
+		Matrix4f res = getMatrix();
+		res.m00 = 2.0f / (right - left);
+		res.m01 = 0.0f;
+		res.m02 = 0.0f;
+		res.m03 = 0.0f;
+		res.m10 = 0.0f;
+		res.m11 = 2.0f / (top - bottom);
+		res.m12 = 0.0f;
+		res.m13 = 0.0f;
+		res.m20 = 0.0f;
+		res.m21 = 0.0f;
+		res.m22 = 2.0f / (zFar - zNear);
+		res.m23 = 0.0f;
+		res.m30 = -(right + left) / (right - left);
+		res.m31 = -(top + bottom) / (top - bottom);
+		res.m32 = (zFar + zNear) / (zFar - zNear);
+		res.m33 = 1.0f;
+	}
+	
+	public static final void glTranslatef(float x, float y, float z) {
+		matrixVector.set(x, y, z);
+		getMatrix().translate(matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	public static final void glTranslated(double x, double y, double z) {
+		matrixVector.set((float)x, (float)y, (float)z);
+		getMatrix().translate(matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	private static final float rad = 0.0174532925f;
+
+	public static final void glRotatef(float angle, float x, float y, float z) {
+		matrixVector.set(x, y, z);
+		getMatrix().rotate(angle * rad, matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	public static final void glRotated(double angle, double x, double y, double z) {
+		matrixVector.set((float)x, (float)y, (float)z);
+		getMatrix().rotate((float)angle * rad, matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	public static final void glScalef(float x, float y, float z) {
+		matrixVector.set(x, y, z);
+		getMatrix().scale(matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	public static final void glScaled(double x, double y, double z) {
+		matrixVector.set((float)x, (float)y, (float)x);
+		getMatrix().scale(matrixVector);
+		if (DisplayList.isCompiling) {
+			throw new IllegalArgumentException("matrix not supported in display list");
+		}
+	}
+	
+	public static final void glPushMatrix() {
+		switch (matrixMode) {
+		case GL_MODELVIEW:
+		default:
+			if (matModelPointer < matModelV.length - 1) {
+				++matModelPointer;
+				matModelV[matModelPointer].load(matModelV[matModelPointer - 1]);
+			} else {
+				System.err.println("modelview matrix stack overflow");
+			}
+			break;
+		case GL_PROJECTION:
+			if (matProjPointer < matProjV.length - 1) {
+				++matProjPointer;
+				matProjV[matProjPointer].load(matProjV[matProjPointer - 1]);
+			} else {
+				System.err.println("projection matrix stack overflow");
+			}
+			break;
+		case GL_TEXTURE:
+			if (matTexPointer < matTexV.length - 1) {
+				++matTexPointer;
+				matTexV[matTexPointer].load(matTexV[matTexPointer - 1]);
+			} else {
+				System.err.println("texture matrix stack overflow");
+			}
+			break;
+		}
+	}
+	
+	public static final void glPopMatrix() {
+		switch (matrixMode) {
+		case GL_MODELVIEW:
+		default:
+			if (matModelPointer > 0) {
+				--matModelPointer;
+			} else {
+				System.err.println("modelview matrix stack underflow");
+			}
+			break;
+		case GL_PROJECTION:
+			if (matProjPointer > 0) {
+				--matProjPointer;
+			} else {
+				System.err.println("projection matrix stack underflow");
+			}
+			break;
+		case GL_TEXTURE:
+			if (matTexPointer > 0) {
+				--matTexPointer;
+			} else {
+				System.err.println("texture matrix stack underflow");
+			}
+			break;
+		}
+	}
+	
+	public static final void glGetFloat(int pname, FloatBuffer param) {
+		switch (pname) {
+		case GL_MODELVIEW_MATRIX:
+		default:
+			matModelV[matModelPointer].store(param);
+			break;
+		case GL_PROJECTION_MATRIX:
+			matProjV[matProjPointer].store(param);
+			break;
+		}
 	}
 	
 	private static Uint8Array bufferUpload = Uint8Array.create(ArrayBuffer.create(4 * 1024 * 1024));
@@ -441,7 +804,10 @@ public class GL11 extends Main.GLEnums {
 
 	private static final int glGetShaderMode1() {
 		int mode = 0;
+		mode = (mode | ((colorMaterial && lighting) ? Main.WebGLShader.LIGHTING : 0));
+		mode = (mode | (fogEnabled ? Main.WebGLShader.FOG : 0));
 		mode = (mode | (alpha ? Main.WebGLShader.ALPHATEST : 0));
+		mode = (mode | (texture2D ? Main.WebGLShader.UNIT0 : 0));
 		return mode;
 	}
 	
@@ -450,21 +816,38 @@ public class GL11 extends Main.GLEnums {
 		mode = (mode | (colorArray ? Main.WebGLShader.COLOR : 0));
 		mode = (mode | (normalArray ? Main.WebGLShader.NORMAL : 0));
 		mode = (mode | (textureArray ? Main.WebGLShader.TEXTURE0 : 0));
+		mode = (mode | ((colorMaterial && lighting) ? Main.WebGLShader.LIGHTING : 0));
+		mode = (mode | (fogEnabled ? Main.WebGLShader.FOG : 0));
 		mode = (mode | (alpha ? Main.WebGLShader.ALPHATEST : 0));
+		mode = (mode | (texture2D ? Main.WebGLShader.UNIT0 : 0));
 		return mode;
 	}
 	
 	public static final void glBindShaders() {
-		Main.WebGLShader shader = WebGLShader = Main.WebGLShader.instance(getShaderMode());
-		shader.use();
-		
-		if (alpha) {
-			shader.alphaTest(alphaValue);
-		}
+		glBindShaders(getShaderMode());
 	}
 	
 	public static final void glBindShaders(int i) {
-		
+		Main.WebGLShader s = WebGLShader = Main.WebGLShader.instance(i);
+		s.use();
+		if (alpha) {
+			s.alphaTest(alphaValue);
+		}
+		s.color(colorR, colorG, colorB, colorA);
+		if (fogEnabled) {
+			s.fogMode((fogPremultiply ? 2 : 0) + fogMode);
+			s.fogColor(fogColorR, fogColorG, fogColorB, fogColorA);
+			s.fogDensity(fogDensity);
+			s.fogStartEnd(fogStart, fogEnd);
+		}
+		s.modelMatrix(matModelV[matModelPointer]);
+		s.projectionMatrix(matProjV[matProjPointer]);
+		s.textureMatrix(matTexV[matTexPointer]);
+		if (colorMaterial && lighting) {
+			s.normal(normalX, normalY, normalZ);
+			s.lightPositions(lightPos0vec, lightPos1vec);
+		}
+		s.tex0Coords(tex0X, tex0Y);
 	}
 	
 	public static final Main.ShaderGL glCreateShader(int p1) {
@@ -621,6 +1004,45 @@ public class GL11 extends Main.GLEnums {
 		return textureIndex;
 	}
 	
+	public static final void glFogi(int pname, int param) {
+		if (pname == GL_FOG_MODE) {
+			switch (param) {
+				default:
+				case GL_LINEAR:
+					fogMode = 1;
+					break;
+				case GL_EXP:
+					fogMode = 2;
+					break;
+			}
+		}
+	}
+
+	public static final void glFogf(int pname, float param) {
+		switch (pname) {
+			case GL_FOG_START:
+				fogStart = param;
+				break;
+			case GL_FOG_END:
+				fogEnd = param;
+				break;
+			case GL_FOG_DENSITY:
+				fogDensity = param;
+				break;
+			default:
+				break;
+		}
+	}
+
+	public static final void glFog(int pname, FloatBuffer param) {
+		if (pname == GL_FOG_COLOR) {
+			fogColorR = param.get();
+			fogColorG = param.get();
+			fogColorB = param.get();
+			fogColorA = param.get();
+		}
+	}
+	
 	private static int appendbufferindex = 0;
 	private static Int32Array appendbuffer = Int32Array.create(ArrayBuffer.create(525000*4));
 
@@ -653,6 +1075,95 @@ public class GL11 extends Main.GLEnums {
 	public static final void glDeleteBuffer(Main.BufferGL p1) {
 		webgl.deleteBuffer(p1.obj);
 	}
+
+	public static final void gluUnProject(float p1, float p2, float p3, FloatBuffer p4, FloatBuffer p5, int[] p6, FloatBuffer p7) {
+		unprojA.load(p4);
+		unprojB.load(p5);
+		Matrix4f.mul(unprojA, unprojB, unprojB);
+		unprojB.invert();
+		unprojC.set(((p1 - (float) p6[0]) / (float) p6[2]) * 2f - 1f, ((p2 - (float) p6[1]) / (float) p6[3]) * 2f - 1f,
+				p3, 1.0f);
+		Matrix4f.transform(unprojB, unprojC, unprojC);
+		p7.put(unprojC.x / unprojC.w);
+		p7.put(unprojC.y / unprojC.w);
+		p7.put(unprojC.z / unprojC.w);
+	}
+
+	public static final void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
+		Matrix4f res = getMatrix();
+		float cotangent = (float) Math.cos(fovy * rad * 0.5f) / (float) Math.sin(fovy * rad * 0.5f);
+		res.m00 = cotangent / aspect;
+		res.m01 = 0.0f;
+		res.m02 = 0.0f;
+		res.m03 = 0.0f;
+		res.m10 = 0.0f;
+		res.m11 = cotangent;
+		res.m12 = 0.0f;
+		res.m13 = 0.0f;
+		res.m20 = 0.0f;
+		res.m21 = 0.0f;
+		res.m22 = (zFar + zNear) / (zFar - zNear);
+		res.m23 = -1.0f;
+		res.m30 = 0.0f;
+		res.m31 = 0.0f;
+		res.m32 = 2.0f * zFar * zNear / (zFar - zNear);
+		res.m33 = 0.0f;
+	}
+
+	public static final void gluPerspectiveFlat(float fovy, float aspect, float zNear, float zFar) {
+		Matrix4f res = getMatrix();
+		float cotangent = (float) Math.cos(fovy * rad * 0.5f) / (float) Math.sin(fovy * rad * 0.5f);
+		res.m00 = cotangent / aspect;
+		res.m01 = 0.0f;
+		res.m02 = 0.0f;
+		res.m03 = 0.0f;
+		res.m10 = 0.0f;
+		res.m11 = cotangent;
+		res.m12 = 0.0f;
+		res.m13 = 0.0f;
+		res.m20 = 0.0f;
+		res.m21 = 0.0f;
+		res.m22 = ((zFar + zNear) / (zFar - zNear)) * 0.001f;
+		res.m23 = -1.0f;
+		res.m30 = 0.0f;
+		res.m31 = 0.0f;
+		res.m32 = 2.0f * zFar * zNear / (zFar - zNear);
+		res.m33 = 0.0f;
+	}
+	
+	public static final String gluErrorString(int p1) {
+		switch (p1) {
+		case GL_INVALID_ENUM:
+			return "GL_INVALID_ENUM";
+		case GL_INVALID_VALUE:
+			return "GL_INVALID_VALUE";
+		case GL_INVALID_OPERATION:
+			return "GL_INVALID_OPERATION";
+		case GL_OUT_OF_MEMORY:
+			return "GL_OUT_OF_MEMORY";
+		case GL_CONTEXT_LOST_WEBGL:
+			return "CONTEXT_LOST_WEBGL";
+		default:
+			return "Unknown Error";
+		}
+	}
+	
+	public static final int glGetError() {
+		int err = webgl.getError();
+		return err;
+	}
+	
+	public static final int glGetVertexes() {
+		int ret = vertexDrawn;
+		vertexDrawn = 0;
+		return ret;
+	}
+
+	public static final int glGetTriangles() {
+		int ret = triangleDrawn;
+		triangleDrawn = 0;
+		return ret;
+	}
 	
 	static {
 		webgl = Main.webgl;
@@ -677,6 +1188,7 @@ public class GL11 extends Main.GLEnums {
 		tessFloatBuffer = Float32Array.create(a);
 		isTessDrawing = false;
 		tessVertexCount = 0;
+		tessDrawMode = GL_QUADS;
 		tessHasTexture = false;
 		tessHasColor = false;
 		tessHasNormals = false;
@@ -693,6 +1205,61 @@ public class GL11 extends Main.GLEnums {
 		bytesUploaded = 0;
 		vertexDrawn = 0;
 		triangleDrawn = 0;
+		
+		fogColorR = 1.0f;
+		fogColorG = 1.0f;
+		fogColorB = 1.0f;
+		fogColorA = 1.0f;
+		fogMode = 1;
+		fogEnabled = false;
+		fogPremultiply = false;
+		fogStart = 1.0f;
+		fogEnd = 1.0f;
+		fogDensity = 1.0f;
+		
+		texture2D = false;
+		lighting = false;
+		colorMaterial = false;
+		
+		normalX = 1.0f;
+		normalY = 0.0f;
+		normalZ = 0.0f;
+		tex0X = 0;
+		tex0Y = 0;
+		
+		colorR = 1.0f;
+		colorG = 1.0f;
+		colorB = 1.0f;
+		colorA = 1.0f;
+		
+		matrixMode = GL_MODELVIEW;
+		matModelV = new Matrix4f[32];
+		matModelPointer = 0;
+		matProjV = new Matrix4f[6];
+		matProjPointer = 0;
+		matTexV = new Matrix4f[16];
+		matTexPointer = 0;
+		
+		for (int i = 0; i < matModelV.length; ++i) {
+			matModelV[i] = new Matrix4f();
+		}
+		
+		for (int i = 0; i < matProjV.length; ++i) {
+			matProjV[i] = new Matrix4f();
+		}
+		
+		for (int i = 0; i < matTexV.length; ++i) {
+			matTexV[i] = new Matrix4f();
+		}
+		
+		matrixVector = new Vector3f();
+		
+		unprojA = new Matrix4f();
+		unprojB = new Matrix4f();
+		unprojC = new Vector4f();
+		
+		lightPos1vec = new Vector4f();
+		lightPos0vec = new Vector4f();
 	}
 	
 	private static Main.WebGLShader WebGLShader = null;
