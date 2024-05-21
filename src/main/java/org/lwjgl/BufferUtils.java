@@ -98,12 +98,58 @@ public class BufferUtils {
 	}
 
     //Wrote my own implementation since JNI isn't supported in TeaVM
-    //I'm not sure if this even works as intended
     private static void zeroBuffer0(Buffer b, long offset, long length) {
     	for (int i = 0; i < b.remaining(); i++) {
-    		//Casting the buffers probably isn't the best way to do this
-    		((ByteBuffer)b).put(i, (byte) 0);
+    		put(b, i, 0);
     	}
+    }
+    
+    private static void put(Buffer b, int i, int i2) {
+    	if(b instanceof ByteBuffer) {
+    		put((ByteBuffer)b, i, i2);
+    	} else if(b instanceof ShortBuffer) {
+    		put((ShortBuffer)b, i, i2);
+    	} else if(b instanceof CharBuffer) {
+    		put((CharBuffer)b, i, i2);
+    	} else if(b instanceof IntBuffer) {
+    		put((IntBuffer)b, i, i2);
+    	} else if(b instanceof FloatBuffer) {
+    		put((FloatBuffer)b, i, i2);
+    	} else if(b instanceof LongBuffer) {
+    		put((LongBuffer)b, i, i2);
+    	} else if(b instanceof DoubleBuffer) {
+    		put((DoubleBuffer)b, i, i2);
+    	} else {
+    		throw new IllegalArgumentException("Unsupported buffer type!");
+    	}
+    }
+    
+    private static void put(ByteBuffer b, int i, int i2) {
+    	b.put(i, (byte) i2);
+    }
+    
+    private static void put(ShortBuffer b, int i, int i2) {
+    	b.put(i, (short) i2);
+    }
+    
+    private static void put(CharBuffer b, int i, int i2) {
+    	b.put(i, (char) i2);
+    }
+    
+    private static void put(IntBuffer b, int i, int i2) {
+    	b.put(i, i2);
+    }
+    
+    private static void put(FloatBuffer b, int i, int i2) {
+    	b.put(i, i2);
+    }
+    
+    private static void put(LongBuffer b, int i, int i2) {
+    	b.put(i, i2);
+    }
+      
+    private static void put(DoubleBuffer b, int i, int i2) {
+    	b.put(i, i2);
     }
 
     //Not in BufferUtils but thought I would add it anyways
