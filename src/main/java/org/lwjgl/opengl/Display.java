@@ -19,7 +19,7 @@ import org.teavm.jso.dom.events.Event;
 
 public class Display {
 	
-	private static DisplayMode currentMode;
+	private static DisplayMode currentMode = new DisplayMode(0, 0);
 	
 	private static int width = 0;
 	private static int height = 0;

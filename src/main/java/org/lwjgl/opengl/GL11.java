@@ -98,6 +98,8 @@ public class GL11 extends Main.GLEnums {
 	
 	private static WebGLBuffer vertexBuffer;
 	private static WebGLBuffer texCoordBuffer;
+	
+	private static int[] viewportCache;
 	 
 	public static final void glAlphaFunc(int func, float ref) {
 		//only GL_GREATER is supported so the first param is ignored
@@ -139,6 +141,21 @@ public class GL11 extends Main.GLEnums {
 		listsIntBuffer.get(lists);
 		
 		for(int i = 0; i < size; i++) {
+			glCallList(lists[i]);
+		}
+	}
+	
+	public static final void glCallLists(Buffer listsBuffer) {
+		if(!(listsBuffer instanceof IntBuffer)) {
+			throw new IllegalArgumentException("invalid buffer type: " + listsBuffer.getClass());
+		}
+		
+		IntBuffer listsIntBuffer = (IntBuffer)listsBuffer;
+		
+		int[] lists = new int[listsIntBuffer.remaining()];
+		listsIntBuffer.get(lists);
+		
+		for(int i = 0; i < lists.length; i++) {
 			glCallList(lists[i]);
 		}
 	}
@@ -624,6 +641,10 @@ public class GL11 extends Main.GLEnums {
 		}
 	}
 	
+	public static final void glCullFace(int cull) {
+		webgl.cullFace(cull);
+	}
+	
 	public static final void glNormal3b(byte nx, byte ny, byte nz) {
 		float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
 		normalX = nx / len;
@@ -702,6 +723,14 @@ public class GL11 extends Main.GLEnums {
 		colorA = (float) alpha;
 	}
 	
+	public static final void glDepthMask(boolean flag) {
+		webgl.depthMask(flag);
+	}
+	
+	public static final void glDepthFunc(int func) {
+		webgl.depthFunc(func);
+	}
+	
 	public static final void glColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
 		webgl.colorMask(red, green, blue, alpha);
 	}
@@ -747,6 +776,26 @@ public class GL11 extends Main.GLEnums {
 		res.m30 = -(right + left) / (right - left);
 		res.m31 = -(top + bottom) / (top - bottom);
 		res.m32 = (zFar + zNear) / (zFar - zNear);
+		res.m33 = 1.0f;
+	}
+	
+	public static final void glOrtho(double left, double right, double bottom, double top, double zNear, double zFar) {
+		Matrix4f res = getMatrix();
+		res.m00 = (float) (2.0f / (right - left));
+		res.m01 = 0.0f;
+		res.m02 = 0.0f;
+		res.m03 = 0.0f;
+		res.m10 = 0.0f;
+		res.m11 = (float) (2.0f / (top - bottom));
+		res.m12 = 0.0f;
+		res.m13 = 0.0f;
+		res.m20 = 0.0f;
+		res.m21 = 0.0f;
+		res.m22 = (float) (2.0f / (zFar - zNear));
+		res.m23 = 0.0f;
+		res.m30 = (float) (-(right + left) / (right - left));
+		res.m31 = (float) (-(top + bottom) / (top - bottom));
+		res.m32 = (float) ((zFar + zNear) / (zFar - zNear));
 		res.m33 = 1.0f;
 	}
 	
@@ -1115,6 +1164,39 @@ public class GL11 extends Main.GLEnums {
 		webgl.bindBuffer(p1, p2 == null ? null : p2.obj);
 	}
 	
+	public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, Buffer pixels) {
+		bytesUploaded += pixels.remaining() * 4;
+		int length = pixels.remaining();
+		Int32Array deevis = Int32Array.create(bufferUpload.getBuffer());
+		for(int i = 0; i < length; ++i) {
+			deevis.set(i, ((IntBuffer)pixels).get());
+		}
+		Uint8Array data = Uint8Array.create(bufferUpload.getBuffer(), 0, length*4);
+		webgl.texSubImage2D(target, level, xoffset, yoffset, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	}
+	
+	public static final void glDeleteTextures(int n, IntBuffer textureBuf) {
+		glDeleteTextures(textureBuf);
+	}
+	
+	public static final void glDeleteTextures(int n, int texture) {
+		glDeleteTextures(texture);
+	}
+	
+	public static final void glDeleteTextures(int texture) {
+		if(textures.containsKey(texture)) {
+			Main.TextureGL textureObj = textures.get(texture);
+			webgl.deleteTexture(textureObj.obj);
+			textures.remove(texture);
+		}
+	}
+	
+	public static final void glDeleteTextures(IntBuffer textureBuf) {
+		while(textureBuf.hasRemaining()) {
+			glDeleteTextures(textureBuf.get());
+		}
+	}
+	
 	public static final int glGenTextures() {
 		textureIndex++;
 		if(textureIndex >= 256) {
@@ -1253,6 +1335,29 @@ public class GL11 extends Main.GLEnums {
 		res.m33 = 0.0f;
 	}
 	
+	public static final void glGetInteger(int pname, int[] param) {
+		if(pname == GL_VIEWPORT) {
+			param[0] = viewportCache[0];
+			param[1] = viewportCache[1];
+			param[2] = viewportCache[2];
+			param[3] = viewportCache[3];
+		}
+	}
+	
+	public static final void glGetInteger(int pname, IntBuffer param) {
+		if(param.remaining() >= 4) {
+			glGetInteger(pname, param.array());
+		}
+	}
+	
+	public static final void glViewport(int x, int y, int width, int height) {
+		viewportCache[0] = x;
+		viewportCache[1] = y;
+		viewportCache[2] = width;
+		viewportCache[3] = height;
+		webgl.viewport(x, y, width, height);
+	}
+	
 	public static final String gluErrorString(int p1) {
 		switch (p1) {
 		case GL_INVALID_ENUM:
@@ -1296,6 +1401,50 @@ public class GL11 extends Main.GLEnums {
 		public static int vertexPosition = 0;
 		public static Float32Array textureCoordBuffer = Float32Array.create(32);
 		public static int textureCoordPosition = 0;
+	}
+	
+	
+	
+	
+	
+	// ---- (unimplemented) ----
+	//TODO: Implement later
+	
+	
+	public static void glLightModelf(int pname, float param) {
+	}
+	
+	public static void glLightModeli(int pname, int param) {
+	}
+	
+	public static void glLightModelfv(int pname, FloatBuffer param) {
+	}
+	
+	public static void glLightModeliv(int pname, IntBuffer param) {
+	}
+	
+	public static void glLightModel(int pname, Buffer param) {
+	}
+	
+	public static void glColorMaterial(int face, int mode) {
+	}
+	
+	public static void glLightf(int light, int pname, float param) {
+	}
+	
+	public static void glLighti(int light, int pname, int param) {
+	}
+	
+	public static void glLightfv(int light, int pname, FloatBuffer param) {
+	}
+	
+	public static void glLightiv(int light, int pname, IntBuffer param) {
+	}
+	
+	public static void glLight(int light, int pname, Buffer param) {
+	}
+	
+	public static void glShadeModel(int shade) {
 	}
 	
 	static {
@@ -1385,6 +1534,8 @@ public class GL11 extends Main.GLEnums {
 		
 		vertexBuffer = webgl.createBuffer();
 		texCoordBuffer = webgl.createBuffer();
+		
+		viewportCache = new int[4];
 	}
 	
 	private static Main.WebGLShader WebGLShader = null;

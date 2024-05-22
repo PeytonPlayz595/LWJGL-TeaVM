@@ -45,6 +45,9 @@ public class Mouse {
 	private Mouse() {
 	}
 	
+	public static void setNativeCursor(Object obj) {
+	}
+	
 	public static void setCursorPosition(int new_x, int new_y) {
 		//Not possible due to security restrictions
 		//Unless you create a custom cursor
