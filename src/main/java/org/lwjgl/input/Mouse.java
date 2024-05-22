@@ -105,8 +105,9 @@ public class Mouse {
 			Main.canvas.addEventListener("mousemove", mousemove = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
-					x = getOffsetX(evt);
-					y = Main.canvas.getClientHeight() - getOffsetY(evt);
+					double ratio = Main.window.getDevicePixelRatio();
+					x = (int)(getOffsetX(evt) * ratio);
+					y = (int)((Main.canvas.getClientHeight() - getOffsetY(evt)) * ratio);
 					dx += evt.getMovementX();
 					dy += -evt.getMovementY();
 					evt.preventDefault();
@@ -236,11 +237,11 @@ public class Mouse {
 	}
 	
 	public static int getEventX() {
-		return currentEvent == null ? -1 : currentEvent.getClientX();
+		return currentEvent == null ? -1 : (int)(currentEvent.getClientX() * Main.window.getDevicePixelRatio());
 	}
 	
 	public static final int getEventY() {
-		return currentEvent == null ? -1 : Main.canvas.getClientHeight() - currentEvent.getClientY();
+		return currentEvent == null ? -1 : (int)((Main.canvas.getClientHeight() - currentEvent.getClientY()) * Main.window.getDevicePixelRatio());
 	}
 	
 	public static int getEventDWheel() {

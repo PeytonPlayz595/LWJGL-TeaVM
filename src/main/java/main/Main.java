@@ -10,6 +10,7 @@ import org.teavm.jso.JSBody;
 import org.teavm.jso.JSObject;
 import org.teavm.jso.browser.Window;
 import org.teavm.jso.canvas.CanvasRenderingContext2D;
+import org.teavm.jso.dom.css.CSSStyleDeclaration;
 import org.teavm.jso.dom.html.HTMLCanvasElement;
 import org.teavm.jso.dom.html.HTMLDocument;
 import org.teavm.jso.dom.html.HTMLElement;
@@ -119,6 +120,8 @@ public class Main {
     "\n" +
     "out vec4 fragColor;\n" +
     "\n" +
+    "#define TEX_MAT3x2(mat4In) mat3x2(mat4In[0].xy,mat4In[1].xy,mat4In[3].xy)\n" +
+    "\n" +
     "void main(){\n" +
     "#ifdef CC_a_color\n" +
     "\tvec4 color = colorUniform * v_color;\n" +
@@ -128,9 +131,9 @@ public class Main {
     "\t\n" +
     "#ifdef CC_unit0\n" +
     "#ifdef CC_a_texture0\n" +
-    "\tcolor *= texture(tex0, (matrix_t * vec4(v_texture0, 0.0, 1.0)).xy).rgba;\n" +
+    "\tcolor *= texture(tex0, (TEX_MAT3x2(matrix_t) * vec3(v_texture0, 1.0)).xy).rgba;\n" +
     "#else\n" +
-    "\tcolor *= texture(tex0, (matrix_t * vec4(texCoordV0, 0.0, 1.0)).xy).rgba;\n" +
+    "\tcolor *= texture(tex0, (TEX_MAT3x2(matrix_t) * vec3(texCoordV0, 1.0)).xy).rgba;\n" +
     "#endif\n" +
     "#endif\n" +
     "\n" +
@@ -153,7 +156,7 @@ public class Main {
     "\t\n" +
     "#ifdef CC_fog\n" +
     "\tfloat dist = sqrt(dot(v_position, v_position));\n" +
-    "\tfloat i = (fogMode == 1) ? clamp((dist - fogStart) / (fogEnd - fogStart), 0.0, 1.0) : clamp(1.0 - pow(2.718, -(fogDensity * dist)), 0.0, 1.0);\n" +
+    "\tfloat i = (fogMode == 1) ? clamp((dist - fogStart) / (fogEnd - fogStart), 0.0, 1.0) : clamp(1.0 - exp(-(fogDensity * dist)), 0.0, 1.0);\n" +
     "\tcolor.rgb = mix(color.rgb, fogColor.xyz, i * fogColor.a);\n" +
     "#endif\n" +
     "\t\n" +
@@ -166,9 +169,10 @@ public class Main {
     public static HTMLDocument document = null;
 	public static HTMLElement parent = null;
 	public static HTMLCanvasElement canvas = null;
-	public static CanvasRenderingContext2D canvasContext = null;
-	public static HTMLCanvasElement canvasBack = null;
 	public static WebGL2RenderingContext webgl = null;
+	public static FramebufferGL backBuffer = null;
+	public static RenderbufferGL backBufferColor = null;
+	public static RenderbufferGL backBufferDepth = null;
 	public static Window window = null;
 	
 	private static int width = 0;
@@ -183,26 +187,53 @@ public class Main {
 		parent.setAttribute("style", (s == null ? "" : s)+"overflow-x:hidden;overflow-y:hidden;");
 		
 		canvas = (HTMLCanvasElement)document.createElement("canvas");
-		width = parent.getClientWidth();
-		height = parent.getClientHeight();
+		double ratio = window.getDevicePixelRatio();
+		width = (int)(parent.getClientWidth() * ratio);
+		height = (int)(parent.getClientHeight() * ratio);
 		canvas.setWidth(width);
 		canvas.setHeight(height);
-		canvasContext = (CanvasRenderingContext2D) canvas.getContext("2d");
 		parent.appendChild(canvas);
-		canvasBack = (HTMLCanvasElement)document.createElement("canvas");
-		canvasBack.setWidth(width);
-		canvasBack.setHeight(height);
-		webgl = (WebGL2RenderingContext) canvasBack.getContext("webgl2", WebGLConfig());
+		CSSStyleDeclaration canvasStyle = canvas.getStyle();
+		canvasStyle.setProperty("width", "100%");
+		canvasStyle.setProperty("height", "100%");
+		canvasStyle.setProperty("image-rendering", "pixelated");
+		webgl = (WebGL2RenderingContext) canvas.getContext("webgl2", WebGLConfig());
 		if(webgl == null) {
 			throw new LWJGLException("WebGL 2.0 is not supported in your browser :(");
 		}
 		setCurrentContext(webgl);
+		setupBackBuffer();
+		resizeBackBuffer(width, height);
 		
 		webgl.getExtension("EXT_texture_filter_anisotropic");
 	}
 	
-	@JSBody(params = { }, script = "return {antialias: false, depth: true, powerPreference: \"high-performance\", desynchronized: false, preserveDrawingBuffer: false, premultipliedAlpha: false, alpha: false};")
+	@JSBody(params = { }, script = "return {antialias: false, depth: true, powerPreference: \"high-performance\", desynchronized: true, preserveDrawingBuffer: false, premultipliedAlpha: false, alpha: false};")
 	public static native JSObject WebGLConfig();
+	
+	public static final void setupBackBuffer() {
+		backBuffer = new FramebufferGL(webgl.createFramebuffer());
+		webgl.bindFramebuffer(webgl.FRAMEBUFFER, backBuffer.obj);
+		backBufferColor = new RenderbufferGL(webgl.createRenderbuffer());
+		webgl.bindRenderbuffer(webgl.RENDERBUFFER, backBufferColor == null ? null : backBufferColor.obj);
+		webgl.framebufferRenderbuffer(webgl.FRAMEBUFFER, webgl.COLOR_ATTACHMENT0, webgl.RENDERBUFFER, backBufferColor == null ? null : backBufferColor.obj);
+		backBufferDepth = new RenderbufferGL(webgl.createRenderbuffer());
+		webgl.bindRenderbuffer(webgl.RENDERBUFFER, backBufferDepth == null ? null : backBufferDepth.obj);
+		webgl.framebufferRenderbuffer(webgl.FRAMEBUFFER, webgl.DEPTH_ATTACHMENT, webgl.RENDERBUFFER, backBufferDepth == null ? null : backBufferDepth.obj);
+	}
+	
+	public static int backBufferWidth = -1;
+	public static int backBufferHeight = -1;
+	public static final void resizeBackBuffer(int w, int h) {
+		if(w != backBufferWidth || h != backBufferHeight) {
+			webgl.bindRenderbuffer(WebGL2RenderingContext.RENDERBUFFER, Main.backBufferColor == null ? null : Main.backBufferColor.obj);
+			webgl.renderbufferStorage(WebGL2RenderingContext.RENDERBUFFER, GL11.GL_RGBA, w, h);
+			webgl.bindRenderbuffer(WebGL2RenderingContext.RENDERBUFFER, Main.backBufferDepth == null ? null : Main.backBufferDepth.obj);
+			webgl.renderbufferStorage(WebGL2RenderingContext.RENDERBUFFER, WebGL2RenderingContext.DEPTH_COMPONENT32F, w, h);
+			backBufferWidth = w;
+			backBufferHeight = h;
+		}
+	}
 	
 	@JSBody(params = { "obj" }, script = "window.currentContext = obj;")
 	private static native int setCurrentContext(JSObject obj);

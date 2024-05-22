@@ -3,8 +3,10 @@ package org.lwjgl.opengl;
 import org.teavm.jso.dom.events.EventListener;
 import org.teavm.jso.dom.html.HTMLCanvasElement;
 import org.teavm.jso.dom.html.HTMLElement;
+import org.teavm.jso.webgl.WebGLRenderingContext;
 
 import main.Main;
+import main.Main.WebGL2RenderingContext;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -107,11 +109,9 @@ public class Display {
 	}
 	
 	private static void createWindow() throws LWJGLException {
-		//double ratio = Main.window.getDevicePixelRatio();
-		//width = (int)(Main.canvas.getClientWidth() * ratio);
-		//height = (int)(Main.canvas.getClientHeight() * ratio);
-		width = Main.canvas.getWidth();
-		height = Main.canvas.getHeight();
+		double ratio = Main.window.getDevicePixelRatio();
+		width = (int)(Main.canvas.getClientWidth() * ratio);
+		height = (int)(Main.canvas.getClientHeight() * ratio);
 		setTitle(title);
 		update();
 	}
@@ -209,21 +209,26 @@ public class Display {
 	}
 	
 	public static void update(boolean processMessages) {
-		setCurrentContext(Main.webgl);
-		Main.canvasContext.drawImage(Main.canvasBack, 0.0D, 0.0D, Main.canvas.getWidth(), Main.canvas.getHeight());
-		
-		//double ratio = Main.window.getDevicePixelRatio();
-		//int w = (int)(Main.canvas.getClientWidth() * ratio);
-		//int h = (int)(Main.canvas.getClientHeight() * ratio);
-		int w = Main.canvas.getWidth();
-		int h = Main.canvas.getHeight();
-		if(w != width || h != height) {
+		double r = Main.window.getDevicePixelRatio();
+		int w = (int)(Main.canvas.getClientWidth() * r);
+		int h = (int)(Main.canvas.getClientHeight() * r);
+		if(width != w || height != h) {
 			windowResized = true;
 		}
+		
 		if(windowResizable && windowResized) {
-			Main.canvas.setWidth(w);
-			Main.canvas.setHeight(h);
+			width = w;
+			height = h;
+			Main.canvas.setWidth(width);
+			Main.canvas.setHeight(height);
 		}
+		
+		Main.webgl.bindFramebuffer(WebGLRenderingContext.FRAMEBUFFER, null);
+		Main.webgl.bindFramebuffer(WebGL2RenderingContext.READ_FRAMEBUFFER, Main.backBuffer.obj);
+		Main.webgl.bindFramebuffer(WebGL2RenderingContext.DRAW_FRAMEBUFFER, null);
+		Main.webgl.blitFramebuffer(0, 0, Main.backBufferWidth, Main.backBufferHeight, 0, 0, w, h, WebGLRenderingContext.COLOR_BUFFER_BIT, WebGLRenderingContext.NEAREST);
+		Main.webgl.bindFramebuffer(WebGLRenderingContext.FRAMEBUFFER, Main.backBuffer.obj);
+		Main.resizeBackBuffer(width, height);
 		
 		Main.document.setTitle(title);
 		
@@ -318,7 +323,7 @@ public class Display {
 	
 	public static int getWidth() {
 		if (Display.isFullscreen()) {
-			return Main.canvas.getClientWidth();
+			return (int)(Main.canvas.getClientWidth() * getPixelScaleFactor());
 		}
 
 		return width;
@@ -326,20 +331,22 @@ public class Display {
 	
 	public static int getHeight() {
 		if (Display.isFullscreen()) {
-			return Main.canvas.getClientWidth();
+			return (int)(Main.canvas.getClientHeight() * getPixelScaleFactor());
 		}
 
-		return width;
+		return height;
 	}
 	
 	public static void setWidth(int w) {
+		w = (int)(w * getPixelScaleFactor());
 		Main.canvas.setWidth(w);
 		width = w;
 	}
 	
-	public static void setHeight(int w) {
-		Main.canvas.setWidth(w);
-		width = w;
+	public static void setHeight(int h) {
+		h = (int)(h * getPixelScaleFactor());
+		Main.canvas.setHeight(h);
+		height = h;
 	}
 	
 	public static float getPixelScaleFactor() {
@@ -357,9 +364,6 @@ public class Display {
 	
 	@JSBody(params = { }, script = "document.exitFullscreen();")
 	private static native void exitFullscreen();
-	
-	@JSBody(params = { "obj" }, script = "window.currentContext = obj;")
-	private static native int setCurrentContext(JSObject obj);
 	
 	@JSBody(script = "return window.document.visibilityState == \"visible\";")
 	public static native boolean jsIsVisible();
