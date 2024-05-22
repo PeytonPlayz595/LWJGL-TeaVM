@@ -1218,8 +1218,8 @@ public class Main {
 		private UniformGL u_light0Pos = null;
 		private UniformGL u_light1Pos = null;
 
-		private final int a_position;
-		private final int a_texture0;
+		public final int a_position;
+		public final int a_texture0;
 		private final int a_color;
 		private final int a_normal;
 

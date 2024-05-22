@@ -3,15 +3,18 @@ package org.lwjgl.opengl;
 import org.lwjgl.util.vector.*;
 
 import java.nio.Buffer;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.HashMap;
 
+import org.teavm.jso.JSBody;
 import org.teavm.jso.typedarrays.ArrayBuffer;
 import org.teavm.jso.typedarrays.Float32Array;
 import org.teavm.jso.typedarrays.Int32Array;
 import org.teavm.jso.typedarrays.Uint8Array;
+import org.teavm.jso.webgl.WebGLBuffer;
 import org.teavm.jso.webgl.WebGLUniformLocation;
 
 import main.Main;
@@ -34,16 +37,6 @@ public class GL11 extends Main.GLEnums {
 	
 	private static final HashMap<Integer, Main.TextureGL> textures;
 	private static int textureIndex;
-	
-	//Tessellator
-	private static Int32Array tessIntBuffer;
-	private static Float32Array tessFloatBuffer;
-	private static boolean isTessDrawing;
-	private static int tessVertexCount;
-	private static int tessDrawMode;
-	private static boolean tessHasTexture;
-	private static boolean tessHasColor;
-	private static boolean tessHasNormals;
 	
 	private static boolean textureArray;
 	private static boolean colorArray;
@@ -102,6 +95,9 @@ public class GL11 extends Main.GLEnums {
 	
 	private static Vector4f lightPos1vec;
 	private static Vector4f lightPos0vec;
+	
+	private static WebGLBuffer vertexBuffer;
+	private static WebGLBuffer texCoordBuffer;
 	 
 	public static final void glAlphaFunc(int func, float ref) {
 		//only GL_GREATER is supported so the first param is ignored
@@ -268,53 +264,169 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glBegin(int mode) {
-		if(isTessDrawing) {
+		if(ImmediateModeData.mode != -1) {
 			glEnd();
 		}
-		isTessDrawing = true;
-		tessVertexCount = 0;
-		tessDrawMode = mode;
-		tessHasTexture = false;
-		tessHasColor = false;
-		tessHasNormals = false;
+		ImmediateModeData.mode = mode;
+		ImmediateModeData.vertexPosition = 0;
+		ImmediateModeData.textureCoordPosition = 0;
+	}
+	
+	public static final void glTexCoord1f(float s) {
+		int currentPos = ImmediateModeData.textureCoordPosition;
+		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
+		ImmediateModeData.textureCoordPosition = currentPos + 1;
+	}
+	
+	public static final void glTexCoord1d(double s) {
+		glTexCoord1f((float)s);
+	}
+	
+	public static final void glTexCoord1i(int s) {
+		glTexCoord1f(s);
+	}
+	
+	public static final void glTexCoord2f(float s, float t) {
+		int currentPos = ImmediateModeData.textureCoordPosition;
+		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.textureCoordBuffer.set(currentPos, s); //x
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t); //y
+		ImmediateModeData.textureCoordPosition = currentPos + 2;
+	}
+	
+	public static final void glTexCoord2d(double s, double t) {
+		glTexCoord2f((float)s, (float)t);
+	}
+	
+	public static final void glTexCoord2i(int s, int t) {
+		glTexCoord2f(s, t);
+	}
+	
+	public static final void glTexCoord3f(float s, float t, float r) {
+		int currentPos = ImmediateModeData.textureCoordPosition;
+		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t);
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 2, r);
+		ImmediateModeData.textureCoordPosition = currentPos + 3;
+	}
+	
+	public static final void glTexCoord3d(double s, double t, double r) {
+		glTexCoord3f((float)s, (float)t, (float)r);
+	}
+	
+	public static final void glTexCoord3i(int s, int t, int r) {
+		glTexCoord3f(s, t, r);
+	}
+	
+	public static final void glTexCoord4f(float s, float t, float r, float q) {
+		int currentPos = ImmediateModeData.textureCoordPosition;
+		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t);
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 2, r);
+		ImmediateModeData.textureCoordBuffer.set(currentPos + 3, q);
+		ImmediateModeData.textureCoordPosition = currentPos + 4;
+	}
+	
+	public static final void glTexCoord4d(double s, double t, double r, double q) {
+		glTexCoord4f((float)s, (float)t, (float)r, (float)q);
+	}
+	
+	public static final void glTexCoord4i(int s, int t, int r, int q) {
+		glTexCoord4f(s, t, r, q);
+	}
+	
+	public static final void glVertex2f(float x, float y) {
+		int currentPos = ImmediateModeData.vertexPosition;
+		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.vertexBuffer.set(currentPos, x);
+		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
+		ImmediateModeData.vertexPosition = currentPos + 2;
+	}
+	
+	public static final void glVertex2d(double x, double y) {
+		glVertex2f((float)x, (float)y);
+	}
+	
+	public static final void glVertex2i(int x, int y) {
+		glVertex2f(x, y);
+	}
+	
+	public static final void glVertex3f(float x, float y, float z) {
+		int currentPos = ImmediateModeData.vertexPosition;
+		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.vertexBuffer.set(currentPos, x);
+		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
+		ImmediateModeData.vertexBuffer.set(currentPos + 2, z);
+		ImmediateModeData.vertexPosition = currentPos + 3;
+	}
+	
+	public static final void glVertex3d(double x, double y, double z) {
+		glVertex3f((float)x, (float)y, (float)z);
+	}
+	
+	public static final void glVertex3i(int x, int y, int z) {
+		glVertex3f(x, y, z);
+	}
+	
+	public static final void glVertex4f(float x, float y, float z, float w) {
+		int currentPos = ImmediateModeData.vertexPosition;
+		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
+			throw new BufferOverflowException();
+		}
+		ImmediateModeData.vertexBuffer.set(currentPos, x);
+		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
+		ImmediateModeData.vertexBuffer.set(currentPos + 2, z);
+		ImmediateModeData.vertexBuffer.set(currentPos + 3, w);
+		ImmediateModeData.vertexPosition = currentPos + 4;
+	}
+	
+	public static final void glVertexdf(double x, double y, double z, double w) {
+		glVertex4f((float)x, (float)y, (float)z, (float)w);
+	}
+	
+	public static final void glVertexdi(int x, int y, int z, int w) {
+		glVertex4f(x, y, z, w);
 	}
 	
 	public static final void glEnd() {
-		if(!isTessDrawing) {
-			throw new IllegalStateException("Not drawing!");
+		if(ImmediateModeData.mode == -1) {
+			return;
 		}
-		isTessDrawing = false;
-		if(tessVertexCount > 0) {
-			if(tessHasTexture) {
-				glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-			}
-			
-			if(tessHasColor) {
-				glEnableClientState(GL_COLOR_ARRAY);
-			}
-			
-			if(tessHasNormals) {
-				glEnableClientState(GL_NORMAL_ARRAY);
-			}
-			
-			glDrawArrays(tessDrawMode, GL_POINTS, tessVertexCount, Int32Array.create(tessIntBuffer.getBuffer(), 0, tessVertexCount * 7));
-			
-			if(tessHasTexture) {
-				glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-			}
-
-			if(tessHasColor) {
-				glDisableClientState(GL_COLOR_ARRAY);
-			}
-
-			if(tessHasNormals) {
-				glDisableClientState(GL_NORMAL_ARRAY);
-			}
-		}
+		
+		//vertex data
+		glBindBuffer(GL_ARRAY_BUFFER, new Main.BufferGL(vertexBuffer));
+		glBufferData(GL_ARRAY_BUFFER, subArray(ImmediateModeData.vertexBuffer, 0, ImmediateModeData.vertexPosition), GL_STATIC_DRAW);
+		glVertexAttribPointer(WebGLShader.a_position, 3, GL_FLOAT, false, 3*4, 0);
+		glEnableVertexAttribArray(WebGLShader.a_position);
+		
+		//texCoord data
+		glBindBuffer(GL_ARRAY_BUFFER, new Main.BufferGL(texCoordBuffer));
+		glBufferData(GL_ARRAY_BUFFER, subArray(ImmediateModeData.textureCoordBuffer, 0, ImmediateModeData.textureCoordPosition), GL_STATIC_DRAW);
+		glVertexAttribPointer(WebGLShader.a_texture0, 2, GL_FLOAT, false, 2*4, 0);
+		glEnableVertexAttribArray(WebGLShader.a_texture0);
+		
+		glDrawArrays(ImmediateModeData.mode, 0, ImmediateModeData.vertexPosition);
+		
+		ImmediateModeData.mode = -1;
 	}
 	
-	private static void addVertex(double d1, double d2, double d3) {
-		
+	public static final void glLineWidth(float width) {
+		webgl.lineWidth(width);
 	}
 	
 	public static final void glClearDepth(double depth) {
@@ -398,7 +510,13 @@ public class GL11 extends Main.GLEnums {
 	}
 
 	public static final void glDrawArrays(int mode, int first, int count) {
-		webgl.drawArrays(mode, first, count);
+		if(mode == GL_QUADS && (count % 4) == 0) {
+			for(int i=0; i < count; i += 4) {
+				webgl.drawArrays(GL_TRIANGLE_FAN, i, 4);
+			}
+		} else {
+			webgl.drawArrays(mode, first, count);
+		}
 	}
 	
 	public static final void glEnableClientState(int cap) {
@@ -794,6 +912,10 @@ public class GL11 extends Main.GLEnums {
 		webgl.bufferData(target, (Int32Array)data, usage);
 	}
 	
+	public static final void glBufferData(int target, Float32Array data, int usage) {
+		webgl.bufferData(target, data, usage);
+	}
+	
 	private static final int glGetShaderMode0() {
 		int mode = 0;
 		mode = (mode | (colorArray ? Main.WebGLShader.COLOR : 0));
@@ -1165,6 +1287,17 @@ public class GL11 extends Main.GLEnums {
 		return ret;
 	}
 	
+	@JSBody(params = {"buf", "i", "i2"}, script = "return buf.subarray(i, i2);")
+	private static native Float32Array subArray(Float32Array buf, int i, int i2);
+	
+	private static class ImmediateModeData {
+		public static int mode = -1;
+		public static Float32Array vertexBuffer = Float32Array.create(32);
+		public static int vertexPosition = 0;
+		public static Float32Array textureCoordBuffer = Float32Array.create(32);
+		public static int textureCoordPosition = 0;
+	}
+	
 	static {
 		webgl = Main.webgl;
 		
@@ -1181,17 +1314,6 @@ public class GL11 extends Main.GLEnums {
 		
 		textures = new HashMap<Integer, Main.TextureGL>(256);
 		textureIndex = 0;
-		
-		//(Emulates Minecraft's Tessellator)
-		ArrayBuffer a = ArrayBuffer.create(524288 * 4);
-		tessIntBuffer = Int32Array.create(a);
-		tessFloatBuffer = Float32Array.create(a);
-		isTessDrawing = false;
-		tessVertexCount = 0;
-		tessDrawMode = GL_QUADS;
-		tessHasTexture = false;
-		tessHasColor = false;
-		tessHasNormals = false;
 		
 		textureArray = false;
 		colorArray = false;
@@ -1260,6 +1382,9 @@ public class GL11 extends Main.GLEnums {
 		
 		lightPos1vec = new Vector4f();
 		lightPos0vec = new Vector4f();
+		
+		vertexBuffer = webgl.createBuffer();
+		texCoordBuffer = webgl.createBuffer();
 	}
 	
 	private static Main.WebGLShader WebGLShader = null;
