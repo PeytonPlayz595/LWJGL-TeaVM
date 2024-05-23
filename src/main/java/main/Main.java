@@ -2,14 +2,14 @@ package main;
 
 import org.lwjgl.util.vector.*;
 
-import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.GL11;
 import org.teavm.jso.JSBody;
 import org.teavm.jso.JSObject;
 import org.teavm.jso.browser.Window;
-import org.teavm.jso.canvas.CanvasRenderingContext2D;
 import org.teavm.jso.dom.css.CSSStyleDeclaration;
 import org.teavm.jso.dom.html.HTMLCanvasElement;
 import org.teavm.jso.dom.html.HTMLDocument;
@@ -212,27 +212,51 @@ public class Main {
 	public static native JSObject WebGLConfig();
 	
 	public static final void setupBackBuffer() {
-		backBuffer = new FramebufferGL(webgl.createFramebuffer());
-		webgl.bindFramebuffer(webgl.FRAMEBUFFER, backBuffer.obj);
-		backBufferColor = new RenderbufferGL(webgl.createRenderbuffer());
-		webgl.bindRenderbuffer(webgl.RENDERBUFFER, backBufferColor == null ? null : backBufferColor.obj);
-		webgl.framebufferRenderbuffer(webgl.FRAMEBUFFER, webgl.COLOR_ATTACHMENT0, webgl.RENDERBUFFER, backBufferColor == null ? null : backBufferColor.obj);
-		backBufferDepth = new RenderbufferGL(webgl.createRenderbuffer());
-		webgl.bindRenderbuffer(webgl.RENDERBUFFER, backBufferDepth == null ? null : backBufferDepth.obj);
-		webgl.framebufferRenderbuffer(webgl.FRAMEBUFFER, webgl.DEPTH_ATTACHMENT, webgl.RENDERBUFFER, backBufferDepth == null ? null : backBufferDepth.obj);
+		backBuffer = createFramebuffer();
+		bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, null);
+		backBufferColor = createRenderBuffer();
+		bindRenderbuffer(backBufferColor);
+		framebufferRenderbuffer(WebGL2RenderingContext.COLOR_ATTACHMENT0, backBufferColor);
+		backBufferDepth = createRenderBuffer();
+		bindRenderbuffer(backBufferDepth);
+		framebufferRenderbuffer(WebGL2RenderingContext.DEPTH_ATTACHMENT, backBufferDepth);
 	}
 	
 	public static int backBufferWidth = -1;
 	public static int backBufferHeight = -1;
 	public static final void resizeBackBuffer(int w, int h) {
 		if(w != backBufferWidth || h != backBufferHeight) {
-			webgl.bindRenderbuffer(WebGL2RenderingContext.RENDERBUFFER, Main.backBufferColor == null ? null : Main.backBufferColor.obj);
-			webgl.renderbufferStorage(WebGL2RenderingContext.RENDERBUFFER, GL11.GL_RGBA, w, h);
-			webgl.bindRenderbuffer(WebGL2RenderingContext.RENDERBUFFER, Main.backBufferDepth == null ? null : Main.backBufferDepth.obj);
-			webgl.renderbufferStorage(WebGL2RenderingContext.RENDERBUFFER, WebGL2RenderingContext.DEPTH_COMPONENT32F, w, h);
+			bindRenderbuffer(backBufferColor);
+			renderbufferStorage(WebGL2RenderingContext.RGBA8, w, h);
+			bindRenderbuffer(backBufferDepth);
+			renderbufferStorage(WebGL2RenderingContext.DEPTH_COMPONENT32F, w, h);
 			backBufferWidth = w;
 			backBufferHeight = h;
 		}
+	}
+	
+	private static final void bindFramebuffer(int p1, FramebufferGL p2) {
+		webgl.bindFramebuffer(p1, p2 == null ? backBuffer.obj : p2.obj);
+	}
+	
+	private static final FramebufferGL createFramebuffer() {
+		return new FramebufferGL(webgl.createFramebuffer());
+	}
+	
+	private static final RenderbufferGL createRenderBuffer() {
+		return new RenderbufferGL(webgl.createRenderbuffer());
+	}
+	
+	private static final void bindRenderbuffer(RenderbufferGL p1) {
+		webgl.bindRenderbuffer(WebGL2RenderingContext.RENDERBUFFER, p1 == null ? null : p1.obj);
+	}
+	
+	private static final void framebufferRenderbuffer(int p1, RenderbufferGL p2) {
+		webgl.framebufferRenderbuffer(WebGL2RenderingContext.FRAMEBUFFER, p1, WebGL2RenderingContext.RENDERBUFFER, p2 == null ? null : p2.obj);
+	}
+	
+	private static final void renderbufferStorage(int p1, int p2, int p3) {
+		webgl.renderbufferStorage(WebGL2RenderingContext.RENDERBUFFER, p1, p2, p3);
 	}
 	
 	@JSBody(params = { "obj" }, script = "window.currentContext = obj;")
@@ -1161,6 +1185,7 @@ public class Main {
 	public static class WebGLShader {
 
 		private static final WebGLShader[] instances = new WebGLShader[128];
+		private static final List<WebGLShader> instanceList = new ArrayList<WebGLShader>();
 		
 		private static String shader = null;
 
@@ -1171,6 +1196,7 @@ public class Main {
 					instances[i] = null;
 				}
 			}
+			instanceList.clear();
 			shader = null;
 		}
 
@@ -1215,6 +1241,7 @@ public class Main {
 				}
 				s = new WebGLShader(i, CC_a_color, CC_a_normal, CC_a_texture0, CC_lighting, CC_fog, CC_alphatest, CC_unit0);
 				instances[i] = s;
+				instanceList.add(s);
 			}
 			return s;
 		}
@@ -1254,8 +1281,7 @@ public class Main {
 		private final int a_color;
 		private final int a_normal;
 
-		public final BufferArrayGL genericArray;
-		public final BufferGL genericBuffer;
+		public final StreamBuffer streamBuffer;
 		public boolean bufferIsInitialized = false;
 
 		private WebGLShader(int j, boolean CC_a_color, boolean CC_a_normal, boolean CC_a_texture0,
@@ -1289,7 +1315,7 @@ public class Main {
 				source += "#define CC_unit0\n";
 			source += shader;
 
-			ShaderGL v = GL11.glCreateShader(GL11.GL_VERTEX_SHADER);
+			ShaderGL v = GL11.glCreateShader(WebGL2RenderingContext.VERTEX_SHADER);
 			GL11.glShaderSource(v, GL11.glGetShaderHeader() + "\n#define CC_VERT\n" + source);
 			GL11.glCompileShader(v);
 
@@ -1298,7 +1324,7 @@ public class Main {
 				throw new RuntimeException("broken shader source");
 			}
 
-			ShaderGL f = GL11.glCreateShader(GL11.GL_FRAGMENT_SHADER);
+			ShaderGL f = GL11.glCreateShader(WebGL2RenderingContext.FRAGMENT_SHADER);
 			GL11.glShaderSource(f, GL11.glGetShaderHeader() + "\n#define CC_FRAG\n" + source);
 			GL11.glCompileShader(f);
 
@@ -1376,28 +1402,28 @@ public class Main {
 			GL11.glUniform1i(GL11.glGetUniformLocation(globject, "tex0"), 0);
 			u_texCoordV0 = GL11.glGetUniformLocation(globject, "texCoordV0");
 
-			genericArray = GL11.glCreateVertexArray();
-			genericBuffer = GL11.glCreateBuffer();
-			GL11.glBindVertexArray(genericArray);
-			GL11.glBindBuffer(GL11.GL_ARRAY_BUFFER, genericBuffer);
-			setupArrayForProgram();
+			streamBuffer = new StreamBuffer(0x8000, 3, 8, (vertexArray, vertexBuffer) -> {
+				GL11.glBindVertexArray0(vertexArray);
+				GL11.glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, vertexBuffer);
+				setupArrayForProgram();
+			});
 
 		}
 
 		public void setupArrayForProgram() {
 			GL11.glEnableVertexAttribArray(a_position);
-			GL11.glVertexAttribPointer(a_position, 3, GL11.GL_FLOAT, false, 28, 0);
+			GL11.glVertexAttribPointer(a_position, 3, WebGL2RenderingContext.FLOAT, false, 28, 0);
 			if (enable_texture0) {
 				GL11.glEnableVertexAttribArray(a_texture0);
-				GL11.glVertexAttribPointer(a_texture0, 2, GL11.GL_FLOAT, false, 28, 12);
+				GL11.glVertexAttribPointer(a_texture0, 2, WebGL2RenderingContext.FLOAT, false, 28, 12);
 			}
 			if (enable_color) {
 				GL11.glEnableVertexAttribArray(a_color);
-				GL11.glVertexAttribPointer(a_color, 4, GL11.GL_UNSIGNED_BYTE, true, 28, 20);
+				GL11.glVertexAttribPointer(a_color, 4, WebGL2RenderingContext.UNSIGNED_BYTE, true, 28, 20);
 			}
 			if (enable_normal) {
 				GL11.glEnableVertexAttribArray(a_normal);
-				GL11.glVertexAttribPointer(a_normal, 4, GL11.GL_UNSIGNED_BYTE, true, 28, 24);
+				GL11.glVertexAttribPointer(a_normal, 4, WebGL2RenderingContext.UNSIGNED_BYTE, true, 28, 24);
 			}
 		}
 
@@ -1408,10 +1434,16 @@ public class Main {
 		public void unuse() {
 
 		}
+		
+		public static void optimize() {
+			for(int i = 0, l = instanceList.size(); i < l; ++i) {
+				instanceList.get(i).streamBuffer.optimize();
+			}
+		}
 
-		private FloatBuffer modelBuffer = FloatBuffer.wrap(new float[16]);
-		private FloatBuffer projectionBuffer = FloatBuffer.wrap(new float[16]);
-		private FloatBuffer textureBuffer = FloatBuffer.wrap(new float[16]);
+		private float[] modelBuffer = new float[16];
+		private float[] projectionBuffer = new float[16];
+		private float[] textureBuffer = new float[16];
 
 		private Matrix4f modelMatrix = (Matrix4f) new Matrix4f().setZero();
 		private Matrix4f projectionMatrix = (Matrix4f) new Matrix4f().setZero();
@@ -1422,21 +1454,21 @@ public class Main {
 		public void modelMatrix(Matrix4f mat) {
 			if (!mat.equals(modelMatrix)) {
 				modelMatrix.load(mat).store(modelBuffer);
-				GL11.glUniformMat4fv(u_matrix_m, modelBuffer.array());
+				GL11.glUniformMat4fv(u_matrix_m, modelBuffer);
 			}
 		}
 
 		public void projectionMatrix(Matrix4f mat) {
 			if (!mat.equals(projectionMatrix)) {
 				projectionMatrix.load(mat).store(projectionBuffer);
-				GL11.glUniformMat4fv(u_matrix_p, projectionBuffer.array());
+				GL11.glUniformMat4fv(u_matrix_p, projectionBuffer);
 			}
 		}
 
 		public void textureMatrix(Matrix4f mat) {
 			if (!mat.equals(textureMatrix)) {
 				textureMatrix.load(mat).store(textureBuffer);
-				GL11.glUniformMat4fv(u_matrix_t, textureBuffer.array());
+				GL11.glUniformMat4fv(u_matrix_t, textureBuffer);
 			}
 		}
 
@@ -1543,5 +1575,132 @@ public class Main {
 			}
 		}
 
+	}
+	
+	public static class StreamBuffer {
+		public final int initialSize;
+		public final int initialCount;
+		public final int maxCount;
+
+		protected StreamBufferInstance[] buffers;
+
+		protected int currentBufferId = 0;
+		protected int overflowCounter = 0;
+
+		protected final IStreamBufferInitializer initializer;
+
+		public static class StreamBufferInstance {
+
+			public BufferArrayGL vertexArray = null;
+			public BufferGL vertexBuffer = null;
+			protected int vertexBufferSize = 0;
+
+			public boolean bindQuad16 = false;
+			public boolean bindQuad32 = false;
+
+			public BufferArrayGL getVertexArray() {
+				return vertexArray;
+			}
+
+			public BufferGL getVertexBuffer() {
+				return vertexBuffer;
+			}
+
+		}
+
+		public static interface IStreamBufferInitializer {
+			void initialize(BufferArrayGL vertexArray, BufferGL vertexBuffer);
+		}
+
+		public StreamBuffer(int initialSize, int initialCount, int maxCount, IStreamBufferInitializer initializer) {
+			this.buffers = new StreamBufferInstance[initialCount];
+			for(int i = 0; i < this.buffers.length; ++i) {
+				this.buffers[i] = new StreamBufferInstance();
+			}
+			this.initialSize = initialSize;
+			this.initialCount = initialCount;
+			this.maxCount = maxCount;
+			this.initializer = initializer;
+		}
+
+		public StreamBufferInstance getBuffer(int requiredMemory) {
+			StreamBufferInstance next = buffers[(currentBufferId++) % buffers.length];
+			if(next.vertexBuffer == null) {
+				next.vertexBuffer = GL11.glCreateBuffer();
+			}
+			if(next.vertexArray == null) {
+				next.vertexArray = GL11.glCreateVertexArray();
+				initializer.initialize(next.vertexArray, next.vertexBuffer);
+			}
+			if(next.vertexBufferSize < requiredMemory) {
+				int newSize = (requiredMemory & 0xFFFFF000) + 0x2000;
+				GL11.glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, next.vertexBuffer);
+				webgl.bufferData(WebGL2RenderingContext.ARRAY_BUFFER, (int)newSize, WebGL2RenderingContext.STREAM_DRAW);
+				next.vertexBufferSize = newSize;
+			}
+			return next;
+		}
+
+		public void optimize() {
+			overflowCounter += currentBufferId - buffers.length;
+			if(overflowCounter < -25) {
+				int newCount = buffers.length - 1 + ((overflowCounter + 25) / 5);
+				if(newCount < initialCount) {
+					newCount = initialCount;
+				}
+				if(newCount < buffers.length) {
+					StreamBufferInstance[] newArray = new StreamBufferInstance[newCount];
+					for(int i = 0; i < buffers.length; ++i) {
+						if(i < newArray.length) {
+							newArray[i] = buffers[i];
+						}else {
+							if(buffers[i].vertexArray != null) {
+								webgl.deleteVertexArray(buffers[i].vertexArray.obj);
+							}
+							if(buffers[i].vertexBuffer != null) {
+								webgl.deleteBuffer(buffers[i].vertexBuffer.obj);
+								
+							}
+						}
+					}
+					buffers = newArray;
+				}
+				overflowCounter = 0;
+			}else if(overflowCounter > 15) {
+				int newCount = buffers.length + 1 + ((overflowCounter - 15) / 5);
+				if(newCount > maxCount) {
+					newCount = maxCount;
+				}
+				if(newCount > buffers.length) {
+					StreamBufferInstance[] newArray = new StreamBufferInstance[newCount];
+					for(int i = 0; i < newArray.length; ++i) {
+						if(i < buffers.length) {
+							newArray[i] = buffers[i];
+						}else {
+							newArray[i] = new StreamBufferInstance();
+						}
+					}
+					buffers = newArray;
+				}
+				overflowCounter = 0;
+			}
+			currentBufferId = 0;
+		}
+
+		public void destroy() {
+			for(int i = 0; i < buffers.length; ++i) {
+				StreamBufferInstance next = buffers[i];
+				if(next.vertexArray != null) {
+					webgl.deleteVertexArray(next.vertexArray.obj);
+				}
+				if(next.vertexBuffer != null) {
+					webgl.deleteBuffer(next.vertexBuffer.obj);
+				}
+			}
+			buffers = new StreamBufferInstance[initialCount];
+			for(int i = 0; i < buffers.length; ++i) {
+				buffers[i] = new StreamBufferInstance();
+			}
+		}
 	}
 }

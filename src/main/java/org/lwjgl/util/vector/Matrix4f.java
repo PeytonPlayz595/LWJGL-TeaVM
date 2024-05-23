@@ -167,6 +167,26 @@ public class Matrix4f extends Matrix implements Serializable {
 		buf.put(m33);
 		return this;
 	}
+	
+	public Matrix store(float[] buf) {
+		buf[0] = m00;
+		buf[1] = m01;
+		buf[2] = m02;
+		buf[3] = m03;
+		buf[4] = m10;
+		buf[5] = m11;
+		buf[6] = m12;
+		buf[7] = m13;
+		buf[8] = m20;
+		buf[9] = m21;
+		buf[10] = m22;
+		buf[11] = m23;
+		buf[12] = m30;
+		buf[13] = m31;
+		buf[14] = m32;
+		buf[15] = m33;
+		return this;
+	}
 
 	public Matrix storeTranspose(FloatBuffer buf) {
 		buf.put(m00);

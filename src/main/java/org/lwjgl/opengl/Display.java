@@ -3,7 +3,6 @@ package org.lwjgl.opengl;
 import org.teavm.jso.dom.events.EventListener;
 import org.teavm.jso.dom.html.HTMLCanvasElement;
 import org.teavm.jso.dom.html.HTMLElement;
-import org.teavm.jso.webgl.WebGLRenderingContext;
 
 import main.Main;
 import main.Main.WebGL2RenderingContext;
@@ -194,6 +193,7 @@ public class Display {
 	public static void swapBuffers() throws LWJGLException {
 		GL11.glFlush();
 		update();
+		GL11.glOptimize();
 	}
 	
 	public static boolean isVisible() {
@@ -221,13 +221,14 @@ public class Display {
 			height = h;
 			Main.canvas.setWidth(width);
 			Main.canvas.setHeight(height);
+			windowResized = false;
 		}
 		
-		Main.webgl.bindFramebuffer(WebGLRenderingContext.FRAMEBUFFER, null);
+		Main.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, null);
 		Main.webgl.bindFramebuffer(WebGL2RenderingContext.READ_FRAMEBUFFER, Main.backBuffer.obj);
 		Main.webgl.bindFramebuffer(WebGL2RenderingContext.DRAW_FRAMEBUFFER, null);
-		Main.webgl.blitFramebuffer(0, 0, Main.backBufferWidth, Main.backBufferHeight, 0, 0, w, h, WebGLRenderingContext.COLOR_BUFFER_BIT, WebGLRenderingContext.NEAREST);
-		Main.webgl.bindFramebuffer(WebGLRenderingContext.FRAMEBUFFER, Main.backBuffer.obj);
+		Main.webgl.blitFramebuffer(0, 0, Main.backBufferWidth, Main.backBufferHeight, 0, 0, w, h, WebGL2RenderingContext.COLOR_BUFFER_BIT, WebGL2RenderingContext.NEAREST);
+		Main.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, Main.backBuffer.obj);
 		Main.resizeBackBuffer(width, height);
 		
 		Main.document.setTitle(title);
