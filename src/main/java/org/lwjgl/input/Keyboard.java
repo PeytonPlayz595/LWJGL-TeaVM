@@ -9,7 +9,7 @@ import org.teavm.jso.JSBody;
 import org.teavm.jso.dom.events.EventListener;
 import org.teavm.jso.dom.events.KeyboardEvent;
 
-import main.Main;
+import main.WebGL;
 
 public class Keyboard {
 	
@@ -167,7 +167,7 @@ public class Keyboard {
 				initialize();
 			}
 			
-			Main.window.addEventListener("keydown", keydown = new EventListener<KeyboardEvent>() {
+			WebGL.window.addEventListener("keydown", keydown = new EventListener<KeyboardEvent>() {
 				@Override
 				public void handleEvent(KeyboardEvent evt) {
 					keyStates[remap(getKeyWhich(evt))] = true;
@@ -176,7 +176,7 @@ public class Keyboard {
 					evt.stopPropagation();
 				}
 			});
-			Main.window.addEventListener("keyup", keyup = new EventListener<KeyboardEvent>() {
+			WebGL.window.addEventListener("keyup", keyup = new EventListener<KeyboardEvent>() {
 				@Override
 				public void handleEvent(KeyboardEvent evt) {
 					keyStates[remap(getKeyWhich(evt))] = false;
@@ -185,7 +185,7 @@ public class Keyboard {
 					evt.stopPropagation();
 				}
 			});
-			Main.window.addEventListener("keypress", keypress = new EventListener<KeyboardEvent>() {
+			WebGL.window.addEventListener("keypress", keypress = new EventListener<KeyboardEvent>() {
 				@Override
 				public void handleEvent(KeyboardEvent evt) {
 					if(repeat_enabled && evt.isRepeat()) keyEvents.add(evt);
@@ -215,9 +215,9 @@ public class Keyboard {
 		
 		created = false;
 		
-		Main.window.removeEventListener("keydown", keydown);
-		Main.window.removeEventListener("keyup", keyup);
-		Main.window.removeEventListener("keypress", keypress);
+		WebGL.window.removeEventListener("keydown", keydown);
+		WebGL.window.removeEventListener("keyup", keyup);
+		WebGL.window.removeEventListener("keypress", keypress);
 		keyEvents.clear();
 	}
 	

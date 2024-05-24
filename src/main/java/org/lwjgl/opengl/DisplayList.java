@@ -1,13 +1,13 @@
 package org.lwjgl.opengl;
 
-import main.Main;
+import main.BufferArrayGL;
+import main.BufferGL;
 
 public class DisplayList {
 	
-	public static boolean isCompiling = false;
 	public final int id;
-	public Main.BufferArrayGL array;
-	public Main.BufferGL buffer;
+	public BufferArrayGL array;
+	public BufferGL buffer;
 	public int mode;
 	public int length;
 	

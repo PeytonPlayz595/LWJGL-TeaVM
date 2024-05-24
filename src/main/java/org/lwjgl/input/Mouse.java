@@ -5,13 +5,14 @@ import java.util.LinkedList;
 import java.util.Map;
 
 import org.lwjgl.LWJGLException;
+import org.lwjgl.opengl.Display;
 import org.teavm.jso.JSBody;
 import org.teavm.jso.dom.events.Event;
 import org.teavm.jso.dom.events.EventListener;
 import org.teavm.jso.dom.events.MouseEvent;
 import org.teavm.jso.dom.events.WheelEvent;
 
-import main.Main;
+import main.WebGL;
 
 
 public class Mouse {
@@ -22,8 +23,8 @@ public class Mouse {
 	private static int x;
 	private static int y;
 
-	private static int dx;
-	private static int dy;
+	private static double dx;
+	private static double dy;
 	private static int dwheel;
 
 	private static String[] buttonName;
@@ -78,14 +79,14 @@ public class Mouse {
 				initialize();
 			}
 		
-			Main.window.addEventListener("contextmenu", contextmenu = new EventListener<MouseEvent>() {
+			WebGL.window.addEventListener("contextmenu", contextmenu = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
 					evt.preventDefault();
 					evt.stopPropagation();
 				}
 			});
-			Main.canvas.addEventListener("mousedown", mousedown = new EventListener<MouseEvent>() {
+			WebGL.canvas.addEventListener("mousedown", mousedown = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
 					int b = evt.getButton();
@@ -95,7 +96,7 @@ public class Mouse {
 					evt.stopPropagation();
 				}
 			});
-			Main.canvas.addEventListener("mouseup", mouseup = new EventListener<MouseEvent>() {
+			WebGL.canvas.addEventListener("mouseup", mouseup = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
 					int b = evt.getButton();
@@ -105,19 +106,22 @@ public class Mouse {
 					evt.stopPropagation();
 				}
 			});
-			Main.canvas.addEventListener("mousemove", mousemove = new EventListener<MouseEvent>() {
+			WebGL.canvas.addEventListener("mousemove", mousemove = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
-					double ratio = Main.window.getDevicePixelRatio();
-					x = (int)(getOffsetX(evt) * ratio);
-					y = (int)((Main.canvas.getClientHeight() - getOffsetY(evt)) * ratio);
-					dx += evt.getMovementX();
-					dy += -evt.getMovementY();
 					evt.preventDefault();
 					evt.stopPropagation();
+					double ratio = WebGL.window.getDevicePixelRatio();
+					x = (int)(getOffsetX(evt) * ratio);
+					y = (int)((WebGL.canvas.getClientHeight() - getOffsetY(evt)) * ratio);
+					dx += evt.getMovementX();
+					dy += -evt.getMovementY();
+					if(Display.isActive()) {
+						mouseEvents.add(evt);
+					}
 				}
 			});
-			Main.canvas.addEventListener("wheel", wheel = new EventListener<WheelEvent>() {
+			WebGL.canvas.addEventListener("wheel", wheel = new EventListener<WheelEvent>() {
 				@Override
 				public void handleEvent(WheelEvent evt) {
 					mouseEvents.add(evt);
@@ -127,7 +131,7 @@ public class Mouse {
 					dwheel += rotation;
 				}
 			});
-			Main.canvas.addEventListener("pointerlockchange", pointerLockChange = new EventListener<MouseEvent>() {
+			WebGL.canvas.addEventListener("pointerlockchange", pointerLockChange = new EventListener<MouseEvent>() {
 				@Override
 				public void handleEvent(MouseEvent evt) {
 					if(isPointerLocked()) {
@@ -137,7 +141,7 @@ public class Mouse {
 					}
 				}
 			});
-			Main.canvas.addEventListener("mouseleave", pointerLockChange = new EventListener<Event>() {
+			WebGL.canvas.addEventListener("mouseleave", pointerLockChange = new EventListener<Event>() {
 				@Override
 				public void handleEvent(Event evt) {
 					evt.preventDefault();
@@ -145,7 +149,7 @@ public class Mouse {
 					isInsideWindow = false;
 				}
 			});
-			Main.canvas.addEventListener("mouseenter", pointerLockChange = new EventListener<Event>() {
+			WebGL.canvas.addEventListener("mouseenter", pointerLockChange = new EventListener<Event>() {
 				@Override
 				public void handleEvent(Event evt) {
 					evt.preventDefault();
@@ -180,12 +184,12 @@ public class Mouse {
 		created = false;
 		
 		resetMouse();
-		Main.window.removeEventListener("contextmenu", contextmenu);
-		Main.window.removeEventListener("mousedown", mousedown);
-		Main.window.removeEventListener("mouseup", mouseup);
-		Main.window.removeEventListener("mousemove", mousemove);
-		Main.window.removeEventListener("wheel", wheel);
-		Main.window.removeEventListener("pointerlockchange", pointerLockChange);
+		WebGL.window.removeEventListener("contextmenu", contextmenu);
+		WebGL.window.removeEventListener("mousedown", mousedown);
+		WebGL.window.removeEventListener("mouseup", mouseup);
+		WebGL.window.removeEventListener("mousemove", mousemove);
+		WebGL.window.removeEventListener("wheel", wheel);
+		WebGL.window.removeEventListener("pointerlockchange", pointerLockChange);
 		mouseEvents.clear();
 	}
 	
@@ -226,25 +230,19 @@ public class Mouse {
 	}
 	
 	public static int getEventDX() {
-		if (currentEvent != null && currentEvent.getType().equals("mousemove")) {
-	        return (int) currentEvent.getMovementX();
-	    }
-	    return 0;
+		return currentEvent == null ? -1 : (int)(currentEvent.getMovementX() * Display.getPixelScaleFactor());
 	}
 	
 	public static int getEventDY() {
-		if (currentEvent != null && currentEvent.getType().equals("mousemove")) {
-	        return (int) -currentEvent.getMovementY();
-	    }
-	    return 0;
+		return currentEvent == null ? -1 : (int)(-currentEvent.getMovementY() * Display.getPixelScaleFactor());
 	}
 	
 	public static int getEventX() {
-		return currentEvent == null ? -1 : (int)(currentEvent.getClientX() * Main.window.getDevicePixelRatio());
+		return currentEvent == null ? -1 : (int)(currentEvent.getClientX() * WebGL.window.getDevicePixelRatio());
 	}
 	
 	public static final int getEventY() {
-		return currentEvent == null ? -1 : (int)((Main.canvas.getClientHeight() - currentEvent.getClientY()) * Main.window.getDevicePixelRatio());
+		return currentEvent == null ? -1 : (int)((WebGL.canvas.getClientHeight() - currentEvent.getClientY()) * WebGL.window.getDevicePixelRatio());
 	}
 	
 	public static int getEventDWheel() {
@@ -260,14 +258,14 @@ public class Mouse {
 	}
 	
 	public static int getDX() {
-		int result = dx;
-		dx = 0;
+		int result = (int)dx;
+		dx = 0.0D;
 		return result;
 	}
 	
 	public static int getDY() {
-		int result = dy;
-		dy = 0;
+		int result = (int)dy;
+		dy = 0.0D;
 		return result;
 	}
 	
@@ -301,9 +299,9 @@ public class Mouse {
 				grab_y = y;
 				dx = 0;
 				dy = 0;
-				Main.canvas.requestPointerLock();
+				WebGL.canvas.requestPointerLock();
 			} else if (!grab && grabbed) {
-				Main.document.exitPointerLock();
+				WebGL.document.exitPointerLock();
 				setCursorPosition(grab_x, grab_y);
 			}
 			

@@ -3,7 +3,6 @@ package org.lwjgl.opengl;
 import org.lwjgl.util.vector.*;
 
 import java.nio.Buffer;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -17,12 +16,19 @@ import org.teavm.jso.typedarrays.Uint8Array;
 import org.teavm.jso.webgl.WebGLBuffer;
 import org.teavm.jso.webgl.WebGLUniformLocation;
 
-import main.Main;
-import main.Main.BufferGL;
-import main.Main.StreamBuffer.StreamBufferInstance;
-import main.Main.WebGL2RenderingContext;
+import main.BufferArrayGL;
+import main.BufferGL;
+import main.GLEnums;
+import main.WebGL;
+import main.ProgramGL;
+import main.ShaderGL;
+import main.StreamBuffer.StreamBufferInstance;
+import main.TextureGL;
+import main.UniformGL;
+import main.WebGL2RenderingContext;
+import main.WebGLShader;
 
-public class GL11 extends Main.GLEnums {
+public class GL11 extends GLEnums {
 	
 	static WebGL2RenderingContext webgl;
 	
@@ -36,18 +42,20 @@ public class GL11 extends Main.GLEnums {
 	private static Float32Array mat3;
 	private static Float32Array mat4;
 	
-	private static final HashMap<Integer, Main.TextureGL> textures;
+	private static final HashMap<Integer, TextureGL> textures;
 	private static int textureIndex;
 	
 	private static boolean textureArray;
 	private static boolean colorArray;
 	private static boolean normalArray;
 	
-	private static DisplayList currentList;
+	private static boolean compilingDisplayList;
+	private static DisplayList currentList = null;
 	private static final HashMap<Integer, DisplayList> lists;
 	private static final HashMap<Integer, DisplayList> initLists;
+	
 	private static BufferGL quadsToTrianglesBuffer;
-	private static Main.BufferArrayGL currentArray;
+	private static BufferArrayGL currentArray;
 	private static int bytesUploaded;
 	private static int vertexDrawn;
 	private static int triangleDrawn;
@@ -196,7 +204,7 @@ public class GL11 extends Main.GLEnums {
 			upload.flip();
 			quadsToTrianglesBuffer = glCreateBuffer();
 			glBindBuffer(WebGL2RenderingContext.ELEMENT_ARRAY_BUFFER, quadsToTrianglesBuffer);
-			glBufferData(WebGL2RenderingContext.ELEMENT_ARRAY_BUFFER, upload, WebGL2RenderingContext.STATIC_DRAW);
+			glBufferData0(WebGL2RenderingContext.ELEMENT_ARRAY_BUFFER, upload, WebGL2RenderingContext.STATIC_DRAW);
 		}
 		if (!currentArray.isQuadBufferBound) {
 			currentArray.isQuadBufferBound = true;
@@ -205,7 +213,7 @@ public class GL11 extends Main.GLEnums {
 		glDrawElements(WebGL2RenderingContext.TRIANGLES, p3 * 6 / 4, WebGL2RenderingContext.UNSIGNED_SHORT, p2 * 6 / 4);
 	}
 	
-	public static final void glBindVertexArray0(Main.BufferArrayGL p1) {
+	public static final void glBindVertexArray0(BufferArrayGL p1) {
 		currentArray = p1;
 		if(p1 == null) {
 			webgl.bindVertexArray(null);
@@ -225,44 +233,44 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glNewList(int list, int mode) {
-		if(!DisplayList.isCompiling) {
+		if (!compilingDisplayList) {
 			currentList = lists.get(list);
-			if(currentList != null) {
+			if (currentList != null) {
 				currentList.mode = -1;
 				currentList.length = 0;
-				DisplayList.isCompiling = true;
+				compilingDisplayList = true;
 			}
 		}
 	}
 	
 	public static final void glCallList(int list) {
-		if(!DisplayList.isCompiling) {
-			DisplayList displayList = initLists.get(list);
-			if(displayList != null && displayList.length > 0) {
-				glBindShaders(displayList.mode | glGetShaderMode1());
-				glBindVertexArray0(displayList.array);
-				glDrawQuadArrays(0, displayList.length);
-				WebGLShader.unuse();
-				vertexDrawn += displayList.length * 6 / 4;
-				triangleDrawn += displayList.length / 2;
+		if (!compilingDisplayList) {
+			DisplayList d = initLists.get(list);
+			if (d != null && d.length > 0) {
+				glBindShaders(d.mode | glGetShaderMode1());
+				glBindVertexArray0(d.array);
+				glDrawQuadArrays(0, d.length);
+				shaderWebGL.unuse();
+				vertexDrawn += d.length * 6 / 4;
+				triangleDrawn += d.length / 2;
 			}
 		}
 	}
 	
 	public static final void glEndList() {
-		if(DisplayList.isCompiling) {
-			DisplayList.isCompiling = false;
+		if (compilingDisplayList) {
+			compilingDisplayList = false;
 			Object upload = glGetLowLevelBuffersAppended();
 			int l = glArrayByteLength(upload);
-			if(l > 0) {
-				if(currentList.buffer == null) {
+			if (l > 0) {
+				if (currentList.buffer == null) {
 					initLists.put(currentList.id, currentList);
 					currentList.array = glCreateVertexArray();
 					currentList.buffer = glCreateBuffer();
-					Main.WebGLShader s = Main.WebGLShader.instance(currentList.mode);
+					WebGLShader f = WebGLShader.instance(currentList.mode);
 					glBindVertexArray0(currentList.array);
 					glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, currentList.buffer);
-					s.setupArrayForProgram();
+					f.setupArrayForProgram();
 				}
 				glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, currentList.buffer);
 				glBufferData(WebGL2RenderingContext.ARRAY_BUFFER, upload, WebGL2RenderingContext.STATIC_DRAW);
@@ -292,7 +300,7 @@ public class GL11 extends Main.GLEnums {
 		webgl.blendFunc(sFactor, dFactor);
 	}
 	
-	public static final void glBindTexture(int p1, Main.TextureGL p2) {
+	public static final void glBindTexture(int p1, TextureGL p2) {
 		if(p2 == null) {
 			webgl.bindTexture(WebGL2RenderingContext.TEXTURE_2D, null);
 		}
@@ -300,7 +308,7 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glBindTexture(int target, int texture) {
-		Main.TextureGL t = textures.get(texture);
+		TextureGL t = textures.get(texture);
 		if(t == null) {
 			webgl.bindTexture(WebGL2RenderingContext.TEXTURE_2D, null);
 			return;
@@ -309,39 +317,11 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glBegin(int mode) {
-		if(ImmediateModeData.mode != -1) {
-			glEnd();
-		}
-		ImmediateModeData.mode = mode;
-		ImmediateModeData.vertexPosition = 0;
-		ImmediateModeData.textureCoordPosition = 0;
-	}
-	
-	public static final void glTexCoord1f(float s) {
-		int currentPos = ImmediateModeData.textureCoordPosition;
-		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
-		ImmediateModeData.textureCoordPosition = currentPos + 1;
-	}
-	
-	public static final void glTexCoord1d(double s) {
-		glTexCoord1f((float)s);
-	}
-	
-	public static final void glTexCoord1i(int s) {
-		glTexCoord1f(s);
+		ImmediateModeData.instance.begin(mode);
 	}
 	
 	public static final void glTexCoord2f(float s, float t) {
-		int currentPos = ImmediateModeData.textureCoordPosition;
-		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.textureCoordBuffer.set(currentPos, s); //x
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t); //y
-		ImmediateModeData.textureCoordPosition = currentPos + 2;
+		ImmediateModeData.instance.setTextureUV(s, t);
 	}
 	
 	public static final void glTexCoord2d(double s, double t) {
@@ -352,53 +332,8 @@ public class GL11 extends Main.GLEnums {
 		glTexCoord2f(s, t);
 	}
 	
-	public static final void glTexCoord3f(float s, float t, float r) {
-		int currentPos = ImmediateModeData.textureCoordPosition;
-		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t);
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 2, r);
-		ImmediateModeData.textureCoordPosition = currentPos + 3;
-	}
-	
-	public static final void glTexCoord3d(double s, double t, double r) {
-		glTexCoord3f((float)s, (float)t, (float)r);
-	}
-	
-	public static final void glTexCoord3i(int s, int t, int r) {
-		glTexCoord3f(s, t, r);
-	}
-	
-	public static final void glTexCoord4f(float s, float t, float r, float q) {
-		int currentPos = ImmediateModeData.textureCoordPosition;
-		if(currentPos > ImmediateModeData.textureCoordBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.textureCoordBuffer.set(currentPos, s);
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 1, t);
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 2, r);
-		ImmediateModeData.textureCoordBuffer.set(currentPos + 3, q);
-		ImmediateModeData.textureCoordPosition = currentPos + 4;
-	}
-	
-	public static final void glTexCoord4d(double s, double t, double r, double q) {
-		glTexCoord4f((float)s, (float)t, (float)r, (float)q);
-	}
-	
-	public static final void glTexCoord4i(int s, int t, int r, int q) {
-		glTexCoord4f(s, t, r, q);
-	}
-	
 	public static final void glVertex2f(float x, float y) {
-		int currentPos = ImmediateModeData.vertexPosition;
-		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.vertexBuffer.set(currentPos, x);
-		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
-		ImmediateModeData.vertexPosition = currentPos + 2;
+		glVertex3f(x, y, 0.0f);
 	}
 	
 	public static final void glVertex2d(double x, double y) {
@@ -410,14 +345,7 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glVertex3f(float x, float y, float z) {
-		int currentPos = ImmediateModeData.vertexPosition;
-		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.vertexBuffer.set(currentPos, x);
-		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
-		ImmediateModeData.vertexBuffer.set(currentPos + 2, z);
-		ImmediateModeData.vertexPosition = currentPos + 3;
+		ImmediateModeData.instance.vertex(x, y, z);
 	}
 	
 	public static final void glVertex3d(double x, double y, double z) {
@@ -428,46 +356,8 @@ public class GL11 extends Main.GLEnums {
 		glVertex3f(x, y, z);
 	}
 	
-	public static final void glVertex4f(float x, float y, float z, float w) {
-		int currentPos = ImmediateModeData.vertexPosition;
-		if(currentPos > ImmediateModeData.vertexBuffer.getLength()) {
-			throw new BufferOverflowException();
-		}
-		ImmediateModeData.vertexBuffer.set(currentPos, x);
-		ImmediateModeData.vertexBuffer.set(currentPos + 1, y);
-		ImmediateModeData.vertexBuffer.set(currentPos + 2, z);
-		ImmediateModeData.vertexBuffer.set(currentPos + 3, w);
-		ImmediateModeData.vertexPosition = currentPos + 4;
-	}
-	
-	public static final void glVertexdf(double x, double y, double z, double w) {
-		glVertex4f((float)x, (float)y, (float)z, (float)w);
-	}
-	
-	public static final void glVertexdi(int x, int y, int z, int w) {
-		glVertex4f(x, y, z, w);
-	}
-	
 	public static final void glEnd() {
-		if(ImmediateModeData.mode == -1) {
-			return;
-		}
-		
-		//vertex data
-		glBindBuffer(GL_ARRAY_BUFFER, new Main.BufferGL(vertexBuffer));
-		glBufferData(GL_ARRAY_BUFFER, subArray(ImmediateModeData.vertexBuffer, 0, ImmediateModeData.vertexPosition), GL_STATIC_DRAW);
-		glVertexAttribPointer(WebGLShader.a_position, 3, GL_FLOAT, false, 3*4, 0);
-		glEnableVertexAttribArray(WebGLShader.a_position);
-		
-		//texCoord data
-		glBindBuffer(GL_ARRAY_BUFFER, new Main.BufferGL(texCoordBuffer));
-		glBufferData(GL_ARRAY_BUFFER, subArray(ImmediateModeData.textureCoordBuffer, 0, ImmediateModeData.textureCoordPosition), GL_STATIC_DRAW);
-		glVertexAttribPointer(WebGLShader.a_texture0, 2, GL_FLOAT, false, 2*4, 0);
-		glEnableVertexAttribArray(WebGLShader.a_texture0);
-		
-		glDrawArrays(ImmediateModeData.mode, 0, ImmediateModeData.vertexPosition);
-		
-		ImmediateModeData.mode = -1;
+		ImmediateModeData.instance.end();
 	}
 	
 	public static final void glLineWidth(float width) {
@@ -475,11 +365,11 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glClearDepth(double depth) {
-		webgl.clearDepth((float)depth);
+		webgl.clearDepth((float)-depth);
 	}
 	
 	public static final void glClearDepth(float depth) {
-		webgl.clearDepth(depth);
+		webgl.clearDepth(-depth);
 	}
 	
 	public static final void glDrawElements(int mode, int type, int count, int offset) {
@@ -489,37 +379,37 @@ public class GL11 extends Main.GLEnums {
 	//Code pulled from eagler b1.3's EaglerAdapter
 	private static Object blankUploadArray = Int32Array.create(525000);
 	public static final void glDrawArrays(int mode, int first, int count, Object buffer) {
-		if(DisplayList.isCompiling) {
-			if(mode == GL_QUADS) {
-				if(currentList.mode == -1) {
+		if (compilingDisplayList) {
+			if (mode == GL_QUADS) {
+				if (currentList.mode == -1) {
 					currentList.mode = glGetShaderMode0();
 				} else {
-					if(currentList.mode != glGetShaderMode0()) {
-						throw new IllegalArgumentException("inconsistent vertex format");
+					if (currentList.mode != glGetShaderMode0()) {
+						System.err.println("vertex format inconsistent in display list");
 					}
-					currentList.length += count;
-					glAppendLowLevelBuffer(buffer);
 				}
+				currentList.length += count;
+				glAppendLowLevelBuffer(buffer);
 			} else {
-				throw new IllegalArgumentException("Only GL_QUADS are supported in display lists!");
+				System.err.println("only GL_QUADS supported in a display list");
 			}
 		} else {
 			int bl = glArrayByteLength(buffer);
 			bytesUploaded += bl;
 			vertexDrawn += count;
-			
+
 			glBindShaders();
-			
-			StreamBufferInstance sb = WebGLShader.streamBuffer.getBuffer(bl);
+
+			StreamBufferInstance sb = shaderWebGL.streamBuffer.getBuffer(bl);
 			glBindVertexArray0(sb.vertexArray);
 			glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, sb.vertexBuffer);
-			if(!WebGLShader.bufferIsInitialized) {
-				WebGLShader.bufferIsInitialized = true;
+			if (!shaderWebGL.bufferIsInitialized) {
+				shaderWebGL.bufferIsInitialized = true;
 				glBufferData(WebGL2RenderingContext.ARRAY_BUFFER, blankUploadArray, WebGL2RenderingContext.DYNAMIC_DRAW);
 			}
 			glBufferSubData(WebGL2RenderingContext.ARRAY_BUFFER, 0, buffer);
-			
-			if(mode == GL_QUADS) {
+
+			if (mode == GL_QUADS) {
 				glDrawQuadArrays(first, count);
 				triangleDrawn += count / 2;
 			} else {
@@ -549,9 +439,9 @@ public class GL11 extends Main.GLEnums {
 				}
 				webgl.drawArrays(drawMode, first, count);
 			}
-			
-			WebGLShader.unuse();
-			
+
+			shaderWebGL.unuse();
+
 		}
 	}
 
@@ -928,7 +818,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glTranslatef(float x, float y, float z) {
 		matrixVector.set(x, y, z);
 		getMatrix().translate(matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -936,7 +826,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glTranslated(double x, double y, double z) {
 		matrixVector.set((float)x, (float)y, (float)z);
 		getMatrix().translate(matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -946,7 +836,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glRotatef(float angle, float x, float y, float z) {
 		matrixVector.set(x, y, z);
 		getMatrix().rotate(angle * rad, matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -954,7 +844,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glRotated(double angle, double x, double y, double z) {
 		matrixVector.set((float)x, (float)y, (float)z);
 		getMatrix().rotate((float)angle * rad, matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -962,7 +852,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glScalef(float x, float y, float z) {
 		matrixVector.set(x, y, z);
 		getMatrix().scale(matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -970,7 +860,7 @@ public class GL11 extends Main.GLEnums {
 	public static final void glScaled(double x, double y, double z) {
 		matrixVector.set((float)x, (float)y, (float)x);
 		getMatrix().scale(matrixVector);
-		if (DisplayList.isCompiling) {
+		if (compilingDisplayList) {
 			throw new IllegalArgumentException("matrix not supported in display list");
 		}
 	}
@@ -1072,51 +962,50 @@ public class GL11 extends Main.GLEnums {
 		}
 	}
 	
-	public static final void glBufferData(int target, Buffer data, int usage) {
-		IntBuffer buffer = (IntBuffer)data;
-		int length = buffer.remaining();
-		Int32Array array = Int32Array.create(bufferUpload.getBuffer());
-		for(int i = 0; i < length; ++i) {
-			array.set(i, buffer.get());
+	public static final void glBufferData0(int p1, IntBuffer p2, int p3) {
+		int len = p2.remaining();
+		Int32Array array  = Int32Array.create(bufferUpload.getBuffer());
+		for(int i = 0; i < len; ++i) {
+			array .set(i, p2.get());
 		}
-		Uint8Array data1 = Uint8Array.create(bufferUpload.getBuffer(), 0, length*4);
-		webgl.bufferData(target, data1, usage);
+		Uint8Array data = Uint8Array.create(bufferUpload.getBuffer(), 0, len*4);
+		webgl.bufferData(p1, data, p3);
 	}
 	
-	public static final void glBufferData(int target, Object data, int usage) {
-		webgl.bufferData(target, (Int32Array)data, usage);
+	public static final void glBufferData00(int p1, long len, int p3) {
+		webgl.bufferData(p1, (int)len, p3);
 	}
 	
-	public static final void glBufferData(int target, Float32Array data, int usage) {
-		webgl.bufferData(target, data, usage);
+	public static final void glBufferData(int p1, Object p2, int p3) {
+		webgl.bufferData(p1, (Int32Array)p2, p3);
 	}
 	
 	private static final int glGetShaderMode0() {
 		int mode = 0;
-		mode = (mode | (colorArray ? Main.WebGLShader.COLOR : 0));
-		mode = (mode | (normalArray ? Main.WebGLShader.NORMAL : 0));
-		mode = (mode | (textureArray ? Main.WebGLShader.TEXTURE0 : 0));
+		mode = (mode | (colorArray ? WebGLShader.COLOR : 0));
+		mode = (mode | (normalArray ? WebGLShader.NORMAL : 0));
+		mode = (mode | (textureArray ? WebGLShader.TEXTURE0 : 0));
 		return mode;
 	}
 
 	private static final int glGetShaderMode1() {
 		int mode = 0;
-		mode = (mode | ((colorMaterial && lighting) ? Main.WebGLShader.LIGHTING : 0));
-		mode = (mode | (fogEnabled ? Main.WebGLShader.FOG : 0));
-		mode = (mode | (alpha ? Main.WebGLShader.ALPHATEST : 0));
-		mode = (mode | (texture2D ? Main.WebGLShader.UNIT0 : 0));
+		mode = (mode | ((colorMaterial && lighting) ? WebGLShader.LIGHTING : 0));
+		mode = (mode | (fogEnabled ? WebGLShader.FOG : 0));
+		mode = (mode | (alpha ? WebGLShader.ALPHATEST : 0));
+		mode = (mode | (texture2D ? WebGLShader.UNIT0 : 0));
 		return mode;
 	}
 	
 	private static int getShaderMode() {
 		int mode = 0;
-		mode = (mode | (colorArray ? Main.WebGLShader.COLOR : 0));
-		mode = (mode | (normalArray ? Main.WebGLShader.NORMAL : 0));
-		mode = (mode | (textureArray ? Main.WebGLShader.TEXTURE0 : 0));
-		mode = (mode | ((colorMaterial && lighting) ? Main.WebGLShader.LIGHTING : 0));
-		mode = (mode | (fogEnabled ? Main.WebGLShader.FOG : 0));
-		mode = (mode | (alpha ? Main.WebGLShader.ALPHATEST : 0));
-		mode = (mode | (texture2D ? Main.WebGLShader.UNIT0 : 0));
+		mode = (mode | (colorArray ? WebGLShader.COLOR : 0));
+		mode = (mode | (normalArray ? WebGLShader.NORMAL : 0));
+		mode = (mode | (textureArray ? WebGLShader.TEXTURE0 : 0));
+		mode = (mode | ((colorMaterial && lighting) ? WebGLShader.LIGHTING : 0));
+		mode = (mode | (fogEnabled ? WebGLShader.FOG : 0));
+		mode = (mode | (alpha ? WebGLShader.ALPHATEST : 0));
+		mode = (mode | (texture2D ? WebGLShader.UNIT0 : 0));
 		return mode;
 	}
 	
@@ -1125,7 +1014,7 @@ public class GL11 extends Main.GLEnums {
 	}
 	
 	public static final void glBindShaders(int i) {
-		Main.WebGLShader s = WebGLShader = Main.WebGLShader.instance(i);
+		WebGLShader s = shaderWebGL = WebGLShader.instance(i);
 		s.use();
 		if (alpha) {
 			s.alphaTest(alphaValue);
@@ -1147,39 +1036,39 @@ public class GL11 extends Main.GLEnums {
 		s.tex0Coords(tex0X, tex0Y);
 	}
 	
-	public static final Main.ShaderGL glCreateShader(int p1) {
-		return new Main.ShaderGL(webgl.createShader(p1));
+	public static final ShaderGL glCreateShader(int p1) {
+		return new ShaderGL(webgl.createShader(p1));
 	}
 	
-	public static final Main.ProgramGL glCreateProgram() {
-		return new Main.ProgramGL(webgl.createProgram());
+	public static final ProgramGL glCreateProgram() {
+		return new ProgramGL(webgl.createProgram());
 	}
 	
-	public static final void glDetachShader(Main.ProgramGL p1, Main.ShaderGL p2) {
+	public static final void glDetachShader(ProgramGL p1, ShaderGL p2) {
 		webgl.detachShader(p1.obj, p2.obj);
 	}
 	
-	public static final void glDeleteShader(Main.ShaderGL p1) {
+	public static final void glDeleteShader(ShaderGL p1) {
 		webgl.deleteShader(p1.obj);
 	}
 	
-	public static final void glCompileShader(Main.ShaderGL p1) {
+	public static final void glCompileShader(ShaderGL p1) {
 		webgl.compileShader(p1.obj);
 	}
 	
-	public static final void glAttachShader(Main.ProgramGL p1, Main.ShaderGL p2) {
+	public static final void glAttachShader(ProgramGL p1, ShaderGL p2) {
 		webgl.attachShader(p1.obj, p2.obj);
 	}
 	
-	public static final void glLinkProgram(Main.ProgramGL p1) {
+	public static final void glLinkProgram(ProgramGL p1) {
 		webgl.linkProgram(p1.obj);
 	}
 	
-	public static final void glShaderSource(Main.ShaderGL p1, String p2) {
+	public static final void glShaderSource(ShaderGL p1, String p2) {
 		webgl.shaderSource(p1.obj, p2);
 	}
 	
-	public static final void glDeleteProgram(Main.ProgramGL program) {
+	public static final void glDeleteProgram(ProgramGL program) {
 		webgl.deleteProgram(program.obj);
 	}
 	
@@ -1187,81 +1076,81 @@ public class GL11 extends Main.GLEnums {
 		return "#version 300 es";
 	}
 	
-	public static final String glGetShaderInfoLog(Main.ShaderGL p1) {
+	public static final String glGetShaderInfoLog(ShaderGL p1) {
 		return webgl.getShaderInfoLog(p1.obj);
 	}
 	
-	public static final String glGetProgramInfoLog(Main.ProgramGL p1) {
+	public static final String glGetProgramInfoLog(ProgramGL p1) {
 		return webgl.getProgramInfoLog(p1.obj);
 	}
 	
-	public static final boolean glGetProgramLinked(Main.ProgramGL p1) {
+	public static final boolean glGetProgramLinked(ProgramGL p1) {
 		return webgl.getProgramParameteri(p1.obj, WebGL2RenderingContext.LINK_STATUS) == 1;
 	}
 	
-	public static final boolean glGetShaderCompiled(Main.ShaderGL p1) {
+	public static final boolean glGetShaderCompiled(ShaderGL p1) {
 		return webgl.getShaderParameteri(p1.obj, WebGL2RenderingContext.COMPILE_STATUS) == 1;
 	}
 	
-	public static final void glBindAttributeLocation(Main.ProgramGL p1, int p2, String p3) {
+	public static final void glBindAttributeLocation(ProgramGL p1, int p2, String p3) {
 		webgl.bindAttribLocation(p1.obj, p2, p3);
 	}
 	
-	public static final Main.UniformGL glGetUniformLocation(Main.ProgramGL p1, String p2) {
+	public static final UniformGL glGetUniformLocation(ProgramGL p1, String p2) {
 		WebGLUniformLocation u = webgl.getUniformLocation(p1.obj, p2);
-		return u == null ? null : new Main.UniformGL(u);
+		return u == null ? null : new UniformGL(u);
 	}
 	
-	public static final void glUseProgram(Main.ProgramGL p1) {
+	public static final void glUseProgram(ProgramGL p1) {
 		if(p1 != null && currentWebGLProgram != p1.hashcode) {
 			currentWebGLProgram = p1.hashcode;
 			webgl.useProgram(p1.obj);
 		}
 	}
 	
-	public static final void glUniform1f(Main.UniformGL p1, float p2) {
+	public static final void glUniform1f(UniformGL p1, float p2) {
 		if(p1 != null) webgl.uniform1f(p1.obj, p2);
 	}
 	
-	public static final void glUniform2f(Main.UniformGL p1, float p2, float p3) {
+	public static final void glUniform2f(UniformGL p1, float p2, float p3) {
 		if(p1 != null) webgl.uniform2f(p1.obj, p2, p3);
 	}
 	
-	public static final void glUniform3f(Main.UniformGL p1, float p2, float p3, float p4) {
+	public static final void glUniform3f(UniformGL p1, float p2, float p3, float p4) {
 		if(p1 != null) webgl.uniform3f(p1.obj, p2, p3, p4);
 	}
 	
-	public static final void glUniform4f(Main.UniformGL p1, float p2, float p3, float p4, float p5) {
+	public static final void glUniform4f(UniformGL p1, float p2, float p3, float p4, float p5) {
 		if(p1 != null) webgl.uniform4f(p1.obj, p2, p3, p4, p5);
 	}
 	
-	public static final void glUniform1i(Main.UniformGL p1, int p2) {
+	public static final void glUniform1i(UniformGL p1, int p2) {
 		if(p1 != null) webgl.uniform1i(p1.obj, p2);
 	}
 	
-	public static final void glUniform2i(Main.UniformGL p1, int p2, int p3) {
+	public static final void glUniform2i(UniformGL p1, int p2, int p3) {
 		if(p1 != null) webgl.uniform2i(p1.obj, p2, p3);
 	}
 	
-	public static final void glUniform3i(Main.UniformGL p1, int p2, int p3, int p4) {
+	public static final void glUniform3i(UniformGL p1, int p2, int p3, int p4) {
 		if(p1 != null) webgl.uniform3i(p1.obj, p2, p3, p4);
 	}
 	
-	public static final void glUniform4i(Main.UniformGL p1, int p2, int p3, int p4, int p5) {
+	public static final void glUniform4i(UniformGL p1, int p2, int p3, int p4, int p5) {
 		if(p1 != null) webgl.uniform4i(p1.obj, p2, p3, p4, p5);
 	}
 	
-	public static final void glUniformMat2fv(Main.UniformGL p1, float[] mat) {
+	public static final void glUniformMat2fv(UniformGL p1, float[] mat) {
 		mat2.set(mat);
 		if(p1 != null) webgl.uniformMatrix2fv(p1.obj, false, mat2);
 	}
 	
-	public static final void glUniformMat3fv(Main.UniformGL p1, float[] mat) {
+	public static final void glUniformMat3fv(UniformGL p1, float[] mat) {
 		mat3.set(mat);
 		if(p1 != null) webgl.uniformMatrix3fv(p1.obj, false, mat3);
 	}
 	
-	public static final void glUniformMat4fv(Main.UniformGL p1, float[] mat) {
+	public static final void glUniformMat4fv(UniformGL p1, float[] mat) {
 		mat4.set(mat);
 		if(p1 != null) webgl.uniformMatrix4fv(p1.obj, false, mat4);
 	}
@@ -1274,15 +1163,15 @@ public class GL11 extends Main.GLEnums {
 		webgl.vertexAttribPointer(p1, p2, p3, p4, p5, p6);
 	}
 	
-	public static final Main.BufferArrayGL glCreateVertexArray() {
-		return new Main.BufferArrayGL(webgl.createVertexArray());
+	public static final BufferArrayGL glCreateVertexArray() {
+		return new BufferArrayGL(webgl.createVertexArray());
 	}
 	
-	public static final Main.BufferGL glCreateBuffer() {
-		return new Main.BufferGL(webgl.createBuffer());
+	public static final BufferGL glCreateBuffer() {
+		return new BufferGL(webgl.createBuffer());
 	}
 	
-	public static final void glBindVertexArray(Main.BufferArrayGL p1) {
+	public static final void glBindVertexArray(BufferArrayGL p1) {
 		webgl.bindVertexArray(p1 == null ? null : p1.obj);
 	}
 	
@@ -1293,9 +1182,9 @@ public class GL11 extends Main.GLEnums {
 	public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, IntBuffer pixels) {
 		bytesUploaded += pixels.remaining() * 4;
 		int length = pixels.remaining();
-		Int32Array deevis = Int32Array.create(bufferUpload.getBuffer());
+		Int32Array array  = Int32Array.create(bufferUpload.getBuffer());
 		for(int i = 0; i < length; ++i) {
-			deevis.set(i, pixels.get());
+			array .set(i, pixels.get());
 		}
 		Uint8Array data = Uint8Array.create(bufferUpload.getBuffer(), 0, length*4);
 		int target1 = 0;
@@ -1311,9 +1200,9 @@ public class GL11 extends Main.GLEnums {
 	public static void glTexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, ByteBuffer pixels) {
 		bytesUploaded += pixels.remaining() * 4;
 		int length = pixels.remaining();
-		Int32Array deevis = Int32Array.create(bufferUpload.getBuffer());
+		Int32Array array  = Int32Array.create(bufferUpload.getBuffer());
 		for(int i = 0; i < length; ++i) {
-			deevis.set(i, pixels.get());
+			array.set(i, pixels.get());
 		}
 		Uint8Array data = Uint8Array.create(bufferUpload.getBuffer(), 0, length*4);
 		int target1 = 0;
@@ -1336,7 +1225,7 @@ public class GL11 extends Main.GLEnums {
 	
 	public static final void glDeleteTextures(int texture) {
 		if(textures.containsKey(texture)) {
-			Main.TextureGL textureObj = textures.get(texture);
+			TextureGL textureObj = textures.get(texture);
 			webgl.deleteTexture(textureObj.obj);
 			textures.remove(texture);
 		}
@@ -1344,7 +1233,6 @@ public class GL11 extends Main.GLEnums {
 	
 	public static final void glDeleteTextures(IntBuffer textureBuf) {
 		while(textureBuf.hasRemaining()) {
-			System.out.println("yee");
 			glDeleteTextures(textureBuf.get());
 		}
 	}
@@ -1356,7 +1244,7 @@ public class GL11 extends Main.GLEnums {
 			textureIndex = 1;
 		}
 		
-		textures.put(textureIndex, new Main.TextureGL(webgl.createTexture()));
+		textures.put(textureIndex, new TextureGL(webgl.createTexture()));
 		return textureIndex;
 	}
 	
@@ -1430,11 +1318,11 @@ public class GL11 extends Main.GLEnums {
 		webgl.bufferSubData(p1, p2, (Int32Array)p3);
 	}
 	
-	public static final void glDeleteVertexArray(Main.BufferArrayGL p1) {
+	public static final void glDeleteVertexArray(BufferArrayGL p1) {
 		webgl.deleteVertexArray(p1.obj);
 	}
 	
-	public static final void glDeleteBuffer(Main.BufferGL p1) {
+	public static final void glDeleteBuffer(BufferGL p1) {
 		webgl.deleteBuffer(p1.obj);
 	}
 
@@ -1559,15 +1447,6 @@ public class GL11 extends Main.GLEnums {
 	@JSBody(params = {"buf", "i", "i2"}, script = "return buf.subarray(i, i2);")
 	private static native Float32Array subArray(Float32Array buf, int i, int i2);
 	
-	private static class ImmediateModeData {
-		public static int mode = -1;
-		public static Float32Array vertexBuffer = Float32Array.create(32);
-		public static int vertexPosition = 0;
-		public static Float32Array textureCoordBuffer = Float32Array.create(32);
-		public static int textureCoordPosition = 0;
-	}
-	
-	
 	
 	
 	
@@ -1593,7 +1472,7 @@ public class GL11 extends Main.GLEnums {
 	public static void glColorMaterial(int face, int mode) {
 		  if (!lighting) return;
 
-		  Main.WebGLShader shader = Main.WebGLShader.instance(getShaderMode());
+		  WebGLShader shader = WebGLShader.instance(getShaderMode());
 		  shader.use();
 
 		  switch (mode) {
@@ -1601,63 +1480,209 @@ public class GL11 extends Main.GLEnums {
 			  if (face == GL11.GL_FRONT) {
 				  shader.color(materialAmbientR, materialAmbientG, materialAmbientB, materialAmbientA);
 		      } else if (face == GL11.GL_BACK) {
-		        shader.color(materialBackAmbientR, materialBackAmbientG, materialBackAmbientB, materialBackAmbientA);
+		    	  shader.color(materialBackAmbientR, materialBackAmbientG, materialBackAmbientB, materialBackAmbientA);
 		      } else {
-		        shader.color(materialAmbientR, materialAmbientG, materialAmbientB, materialAmbientA);
+		    	  shader.color(materialAmbientR, materialAmbientG, materialAmbientB, materialAmbientA);
+		    	  shader.color(materialBackAmbientR, materialBackAmbientG, materialBackAmbientB, materialBackAmbientA);
 		      }
 		      break;
 		  case GL11.GL_DIFFUSE:
 		      if (face == GL11.GL_FRONT) {
-		        shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
+		    	  shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
 		      } else if (face == GL11.GL_BACK) {
-		        shader.color(materialBackDiffuseR, materialBackDiffuseG, materialBackDiffuseB, materialBackDiffuseA);
+		    	  shader.color(materialBackDiffuseR, materialBackDiffuseG, materialBackDiffuseB, materialBackDiffuseA);
 		      } else {
-		        shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
+		    	  shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
+		    	  shader.color(materialBackDiffuseR, materialBackDiffuseG, materialBackDiffuseB, materialBackDiffuseA);
 		      }
 		      break;
 		  case GL11.GL_SPECULAR:
 		      if (face == GL11.GL_FRONT) {
-		        shader.color(materialSpecularR, materialSpecularG, materialSpecularB, materialSpecularA);
+		    	  shader.color(materialSpecularR, materialSpecularG, materialSpecularB, materialSpecularA);
 		      } else if (face == GL11.GL_BACK) {
-		        shader.color(materialBackSpecularR, materialBackSpecularG, materialBackSpecularB, materialBackSpecularA);
+		    	  shader.color(materialBackSpecularR, materialBackSpecularG, materialBackSpecularB, materialBackSpecularA);
 		      } else {
-		        shader.color(materialSpecularR, materialSpecularG, materialSpecularB, materialSpecularA);
+		    	  shader.color(materialSpecularR, materialSpecularG, materialSpecularB, materialSpecularA);
+		    	  shader.color(materialBackSpecularR, materialBackSpecularG, materialBackSpecularB, materialBackSpecularA);
 		      }
 		      break;
 		  case GL11.GL_EMISSION:
 		      if (face == GL11.GL_FRONT) {
-		        shader.color(materialEmissionR, materialEmissionG, materialEmissionB, materialEmissionA);
+		    	  shader.color(materialEmissionR, materialEmissionG, materialEmissionB, materialEmissionA);
 		      } else if (face == GL11.GL_BACK) {
-		        shader.color(materialBackEmissionR, materialBackEmissionG, materialBackEmissionB, materialBackEmissionA);
+		    	  shader.color(materialBackEmissionR, materialBackEmissionG, materialBackEmissionB, materialBackEmissionA);
 		      } else {
-		        shader.color(materialEmissionR, materialEmissionG, materialEmissionB, materialEmissionA);
+		    	  shader.color(materialEmissionR, materialEmissionG, materialEmissionB, materialEmissionA);
+		    	  shader.color(materialBackEmissionR, materialBackEmissionG, materialBackEmissionB, materialBackEmissionA);
 		      }
 		      break;
+		  case GL11.GL_AMBIENT_AND_DIFFUSE:
+			  if (face == GL11.GL_FRONT) {
+				  shader.color(materialAmbientR, materialAmbientG, materialAmbientB, materialAmbientA);
+				  shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
+		      } else if (face == GL11.GL_BACK) {
+		    	  shader.color(materialBackAmbientR, materialBackAmbientG, materialBackAmbientB, materialBackAmbientA);
+		    	  shader.color(materialBackDiffuseR, materialBackDiffuseG, materialBackDiffuseB, materialBackDiffuseA);
+		      } else {
+		    	  shader.color(materialAmbientR, materialAmbientG, materialAmbientB, materialAmbientA);
+		    	  shader.color(materialBackAmbientR, materialBackAmbientG, materialBackAmbientB, materialBackAmbientA);
+		    	  shader.color(materialDiffuseR, materialDiffuseG, materialDiffuseB, materialDiffuseA);
+		    	  shader.color(materialBackDiffuseR, materialBackDiffuseG, materialBackDiffuseB, materialBackDiffuseA);
+		      }
+			  break;
 		  default:
 			  break;
 		  }
 	}
 	
 	public static void glLightf(int light, int pname, float param) {
+		if (light == GL_LIGHT0) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(param, param, param, param);
+				glFlipLightMatrix();
+			}
+		} else if (light == GL_LIGHT1) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(param, param, param, param);
+				glFlipLightMatrix();
+			}
+		}
 	}
 	
 	public static void glLighti(int light, int pname, int param) {
+		glLightf(light, pname, param);
 	}
 	
 	public static void glLightfv(int light, int pname, FloatBuffer param) {
+		float[] array = new float[param.remaining()];
+		param.get(array);
+		if (light == GL_LIGHT0) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
+				glFlipLightMatrix();
+			}
+		} else if (light == GL_LIGHT1) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
+				glFlipLightMatrix();
+			}
+		}
 	}
 	
 	public static void glLightiv(int light, int pname, IntBuffer param) {
+		int[] array = new int[param.remaining()];
+		param.get(array);
+		if (light == GL_LIGHT0) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
+				glFlipLightMatrix();
+			}
+		} else if (light == GL_LIGHT1) {
+			if (pname == GL_POSITION) {
+				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
+				glFlipLightMatrix();
+			}
+		}
 	}
 	
 	public static void glLight(int light, int pname, Buffer param) {
+		if(param instanceof IntBuffer) {
+			glLightiv(light, pname, (IntBuffer)param);
+		} else if(param instanceof FloatBuffer) {
+			glLightfv(light, pname, (FloatBuffer)param);
+		}
+	}
+	
+	private static final void copyModelToLightMatrix(float par1, float par2, float par3, float par4) {
+		lightPos0vec.set(par1, par2, -par3, par4);
+		lightPos0vec.normalise();
+		lightPos1vec.set(-par1, par2, par3, par4);
+		lightPos1vec.normalise();
+		Matrix4f.transform(matModelV[matModelPointer], lightPos0vec, lightPos0vec).normalise();
+		Matrix4f.transform(matModelV[matModelPointer], lightPos1vec, lightPos1vec).normalise();
+	}
+	
+	public static void glFlipLightMatrix() {
+		lightPos0vec.x = -lightPos0vec.x;
+		lightPos1vec.x = -lightPos1vec.x;
+		lightPos0vec.y = -lightPos0vec.y;
+		lightPos1vec.y = -lightPos1vec.y;
+		lightPos0vec.z = -lightPos0vec.z;
+		lightPos1vec.z = -lightPos1vec.z;
 	}
 	
 	public static void glShadeModel(int shade) {
 	}
 	
+	private static final class ImmediateModeData {
+		private Float32Array floatBuffer;
+		private int vertices = 0;
+		private float u;
+		private float v;
+		private boolean texture = false;
+		private int rawBufferIndex = 0;
+		public static ImmediateModeData instance = new ImmediateModeData();
+		private int mode = 7;
+
+		public ImmediateModeData() {
+			ArrayBuffer a = ArrayBuffer.create(525000 * 4);
+			this.floatBuffer = Float32Array.create(a);
+		}
+
+		public final void end() {
+			if(this.vertices > 0) {
+				if(this.texture) {
+					GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+				}
+
+				GL11.glDrawArrays(mode, 0, this.vertices, Int32Array.create(floatBuffer.getBuffer(), 0, this.vertices * 7));
+		         
+				if(this.texture) {
+					GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
+				}
+			}
+
+			this.clear();
+		}
+
+		private void clear() {
+			this.vertices = 0;
+			this.rawBufferIndex = 0;
+		}
+
+		public final void begin(int mode) {
+			this.clear();
+			this.texture = false;
+			this.mode = mode;
+		}
+		   
+		public void setTextureUV(float par1, float par3) {
+			this.texture = true;
+			this.u = par1;
+			this.v = par3;
+		}
+
+		public final void vertex(float var1, float var2, float var3) {
+			++this.vertices;
+			int bufferIndex = this.rawBufferIndex;
+			Float32Array floatBuffer0 = floatBuffer;
+				
+			floatBuffer0.set(bufferIndex + 0, (float) (var1));
+			floatBuffer0.set(bufferIndex + 1, (float) (var2));
+			floatBuffer0.set(bufferIndex + 2, (float) (var3));
+				
+			if(this.texture) {
+				floatBuffer0.set(bufferIndex + 3, this.u);
+				floatBuffer0.set(bufferIndex + 4, this.v);
+			}
+
+			this.rawBufferIndex += 7;
+		}
+
+	}
+	
 	static {
-		webgl = Main.webgl;
+		webgl = WebGL.webgl;
 		
 		
 		alphaValue = 0.1f;
@@ -1670,13 +1695,14 @@ public class GL11 extends Main.GLEnums {
 		mat3 = Float32Array.create(9);
 		mat4 = Float32Array.create(16);
 		
-		textures = new HashMap<Integer, Main.TextureGL>(256);
+		textures = new HashMap<Integer, TextureGL>(256);
 		textureIndex = 0;
 		
 		textureArray = false;
 		colorArray = false;
 		normalArray = false;
 		
+		compilingDisplayList = false;
 		currentList = null;
 		lists = new HashMap<Integer, DisplayList>();
 		initLists = new HashMap<Integer, DisplayList>();
@@ -1787,6 +1813,6 @@ public class GL11 extends Main.GLEnums {
 		materialBackEmissionA = 1.0f;
 	}
 	
-	private static Main.WebGLShader WebGLShader = null;
+	private static WebGLShader shaderWebGL = null;
 	
 }

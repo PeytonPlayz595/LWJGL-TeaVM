@@ -4,8 +4,8 @@ import org.teavm.jso.dom.events.EventListener;
 import org.teavm.jso.dom.html.HTMLCanvasElement;
 import org.teavm.jso.dom.html.HTMLElement;
 
-import main.Main;
-import main.Main.WebGL2RenderingContext;
+import main.WebGL;
+import main.WebGL2RenderingContext;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -61,9 +61,9 @@ public class Display {
 	
 	static {
 		fullscreenQuery = fullscreenMediaQuery();
-		Main.window.addEventListener("resize", resizeEvent);
-		Main.window.addEventListener("blue", blurEvent);
-		Main.window.addEventListener("focus", focusEvent);
+		WebGL.window.addEventListener("resize", resizeEvent);
+		WebGL.window.addEventListener("blue", blurEvent);
+		WebGL.window.addEventListener("focus", focusEvent);
 	}
 	
 	private Display() {
@@ -93,7 +93,7 @@ public class Display {
 	
 	private static int getWindowX() {
 		if(!isFullscreen()) {
-			return Main.window.getScreenX();
+			return WebGL.window.getScreenX();
 		} else {
 			return 0;
 		}
@@ -101,16 +101,16 @@ public class Display {
 	
 	private static int getWindowY() {
 		if(!isFullscreen()) {
-			return Main.window.getScreenY();
+			return WebGL.window.getScreenY();
 		} else {
 			return 0;
 		}
 	}
 	
 	private static void createWindow() throws LWJGLException {
-		double ratio = Main.window.getDevicePixelRatio();
-		width = (int)(Main.canvas.getClientWidth() * ratio);
-		height = (int)(Main.canvas.getClientHeight() * ratio);
+		double ratio = WebGL.window.getDevicePixelRatio();
+		width = (int)(WebGL.canvas.getClientWidth() * ratio);
+		height = (int)(WebGL.canvas.getClientHeight() * ratio);
 		setTitle(title);
 		update();
 	}
@@ -152,7 +152,7 @@ public class Display {
 	}
 	
 	public static HTMLCanvasElement getParent() {
-		return Main.canvas;
+		return WebGL.canvas;
 	}
 
 	public static void setParent(HTMLCanvasElement parent) throws LWJGLException {
@@ -162,7 +162,7 @@ public class Display {
 	public static void setFullscreen(boolean fullscreen) throws LWJGLException {
 		if(fullscreen) {
 			if(!isFullscreen()) {
-				requestFullscreen(Main.parent);
+				requestFullscreen(WebGL.parent);
 			}
 		} else {
 			if(isFullscreen()) {
@@ -209,9 +209,9 @@ public class Display {
 	}
 	
 	public static void update(boolean processMessages) {
-		double r = Main.window.getDevicePixelRatio();
-		int w = (int)(Main.canvas.getClientWidth() * r);
-		int h = (int)(Main.canvas.getClientHeight() * r);
+		double r = WebGL.window.getDevicePixelRatio();
+		int w = (int)(WebGL.canvas.getClientWidth() * r);
+		int h = (int)(WebGL.canvas.getClientHeight() * r);
 		if(width != w || height != h) {
 			windowResized = true;
 		}
@@ -219,19 +219,19 @@ public class Display {
 		if(windowResizable && windowResized) {
 			width = w;
 			height = h;
-			Main.canvas.setWidth(width);
-			Main.canvas.setHeight(height);
+			WebGL.canvas.setWidth(width);
+			WebGL.canvas.setHeight(height);
 			windowResized = false;
 		}
 		
-		Main.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, null);
-		Main.webgl.bindFramebuffer(WebGL2RenderingContext.READ_FRAMEBUFFER, Main.backBuffer.obj);
-		Main.webgl.bindFramebuffer(WebGL2RenderingContext.DRAW_FRAMEBUFFER, null);
-		Main.webgl.blitFramebuffer(0, 0, Main.backBufferWidth, Main.backBufferHeight, 0, 0, w, h, WebGL2RenderingContext.COLOR_BUFFER_BIT, WebGL2RenderingContext.NEAREST);
-		Main.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, Main.backBuffer.obj);
-		Main.resizeBackBuffer(width, height);
+		WebGL.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, null);
+		WebGL.webgl.bindFramebuffer(WebGL2RenderingContext.READ_FRAMEBUFFER, WebGL.backBuffer.obj);
+		WebGL.webgl.bindFramebuffer(WebGL2RenderingContext.DRAW_FRAMEBUFFER, null);
+		WebGL.webgl.blitFramebuffer(0, 0, WebGL.backBufferWidth, WebGL.backBufferHeight, 0, 0, w, h, WebGL2RenderingContext.COLOR_BUFFER_BIT, WebGL2RenderingContext.NEAREST);
+		WebGL.webgl.bindFramebuffer(WebGL2RenderingContext.FRAMEBUFFER, WebGL.backBuffer.obj);
+		WebGL.resizeBackBuffer(width, height);
 		
-		Main.document.setTitle(title);
+		WebGL.document.setTitle(title);
 		
 		try {
 			Thread.sleep(1l);
@@ -324,7 +324,7 @@ public class Display {
 	
 	public static int getWidth() {
 		if (Display.isFullscreen()) {
-			return (int)(Main.canvas.getClientWidth() * getPixelScaleFactor());
+			return (int)(WebGL.canvas.getClientWidth() * getPixelScaleFactor());
 		}
 
 		return width;
@@ -332,7 +332,7 @@ public class Display {
 	
 	public static int getHeight() {
 		if (Display.isFullscreen()) {
-			return (int)(Main.canvas.getClientHeight() * getPixelScaleFactor());
+			return (int)(WebGL.canvas.getClientHeight() * getPixelScaleFactor());
 		}
 
 		return height;
@@ -340,18 +340,18 @@ public class Display {
 	
 	public static void setWidth(int w) {
 		w = (int)(w * getPixelScaleFactor());
-		Main.canvas.setWidth(w);
+		WebGL.canvas.setWidth(w);
 		width = w;
 	}
 	
 	public static void setHeight(int h) {
 		h = (int)(h * getPixelScaleFactor());
-		Main.canvas.setHeight(h);
+		WebGL.canvas.setHeight(h);
 		height = h;
 	}
 	
 	public static float getPixelScaleFactor() {
-		return (float) Main.window.getDevicePixelRatio();
+		return (float) WebGL.window.getDevicePixelRatio();
 	}
 	
 	@JSBody(params = {}, script = "return window.matchMedia('(display-mode: fullscreen)');")
