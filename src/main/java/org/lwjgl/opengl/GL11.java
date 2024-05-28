@@ -246,13 +246,56 @@ public class GL11 extends GLEnums {
 	public static final void glCallList(int list) {
 		if (!compilingDisplayList) {
 			DisplayList d = initLists.get(list);
-			if (d != null && d.length > 0) {
-				glBindShaders(d.mode | glGetShaderMode1());
-				glBindVertexArray0(d.array);
-				glDrawQuadArrays(0, d.length);
+			if (d != null && d.length > 0 && d.currentBuffer != null) {
+				if(d.drawMode == GL_QUADS) {
+					glBindShaders(d.mode | glGetShaderMode1());
+					glBindVertexArray0(d.array);
+					glDrawQuadArrays(0, d.length);
+					vertexDrawn += d.length * 6 / 4;
+					triangleDrawn += d.length / 2;
+				} else {
+					int bl = glArrayByteLength(d.currentBuffer);
+					bytesUploaded += bl;
+					vertexDrawn += d.count;
+
+					glBindShaders();
+
+					StreamBufferInstance sb = shaderWebGL.streamBuffer.getBuffer(bl);
+					glBindVertexArray0(sb.vertexArray);
+					glBindBuffer(WebGL2RenderingContext.ARRAY_BUFFER, sb.vertexBuffer);
+					if (!shaderWebGL.bufferIsInitialized) {
+						shaderWebGL.bufferIsInitialized = true;
+						glBufferData(WebGL2RenderingContext.ARRAY_BUFFER, blankUploadArray, WebGL2RenderingContext.DYNAMIC_DRAW);
+					}
+					glBufferSubData(WebGL2RenderingContext.ARRAY_BUFFER, 0, d.currentBuffer);
+					int drawMode = 0;
+					switch (d.drawMode) {
+					default:
+					case GL_TRIANGLES:
+						drawMode = WebGL2RenderingContext.TRIANGLES;
+						triangleDrawn += d.count / 3;
+						break;
+					case GL_TRIANGLE_STRIP:
+						drawMode = WebGL2RenderingContext.TRIANGLE_STRIP;
+						triangleDrawn += d.count - 2;
+						break;
+					case GL_TRIANGLE_FAN:
+						drawMode = WebGL2RenderingContext.TRIANGLE_FAN;
+						triangleDrawn += d.count - 2;
+						break;
+					case GL_LINE_STRIP:
+						drawMode = WebGL2RenderingContext.LINE_STRIP;
+						triangleDrawn += d.count - 1;
+						break;
+					case GL_LINES:
+						drawMode = WebGL2RenderingContext.LINES;
+						triangleDrawn += d.count / 2;
+						break;
+					}
+					webgl.drawArrays(drawMode, d.first, d.count);
+				}
+				
 				shaderWebGL.unuse();
-				vertexDrawn += d.length * 6 / 4;
-				triangleDrawn += d.length / 2;
 			}
 		}
 	}
@@ -380,19 +423,19 @@ public class GL11 extends GLEnums {
 	private static Object blankUploadArray = Int32Array.create(525000);
 	public static final void glDrawArrays(int mode, int first, int count, Object buffer) {
 		if (compilingDisplayList) {
-			if (mode == GL_QUADS) {
-				if (currentList.mode == -1) {
-					currentList.mode = glGetShaderMode0();
-				} else {
-					if (currentList.mode != glGetShaderMode0()) {
-						System.err.println("vertex format inconsistent in display list");
-					}
-				}
-				currentList.length += count;
-				glAppendLowLevelBuffer(buffer);
+			if (currentList.mode == -1) {
+				currentList.mode = glGetShaderMode0();
 			} else {
-				System.err.println("only GL_QUADS supported in a display list");
+				if (currentList.mode != glGetShaderMode0()) {
+					System.err.println("vertex format inconsistent in display list");
+				}
 			}
+			currentList.length += count;
+			currentList.drawMode = mode;
+			currentList.first = first;
+			currentList.count = count;
+			currentList.currentBuffer = buffer;
+			glAppendLowLevelBuffer(buffer);
 		} else {
 			int bl = glArrayByteLength(buffer);
 			bytesUploaded += bl;
