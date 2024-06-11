@@ -444,11 +444,11 @@ public class GL11 extends GLEnums {
 	}
 	
 	public static final void glClearDepth(double depth) {
-		webgl.clearDepth((float)-depth);
+		webgl.clearDepth((float)(1.0F-depth));
 	}
 	
 	public static final void glClearDepth(float depth) {
-		webgl.clearDepth(-depth);
+		webgl.clearDepth(1.0F-depth);
 	}
 	
 	public static final void glDrawElements(int mode, int type, int count, int offset) {
@@ -794,12 +794,17 @@ public class GL11 extends GLEnums {
 		case GL_GREATER:
 			func1 = WebGL2RenderingContext.LESS;
 			break;
-		case GL_LEQUAL:
-			func1 = WebGL2RenderingContext.GEQUAL;
+		case GL_GEQUAL:
+			func1 = WebGL2RenderingContext.LEQUAL;
 			break;
 		case GL_EQUAL:
 			func1 = WebGL2RenderingContext.EQUAL;
-		default:
+			break;
+		case GL_LEQUAL:
+			func1 = WebGL2RenderingContext.GEQUAL;
+			break;
+		case GL_LESS:
+			func1 = WebGL2RenderingContext.GREATER;
 			break;
 		}
 		webgl.depthFunc(func1);
