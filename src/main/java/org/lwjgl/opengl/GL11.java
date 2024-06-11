@@ -106,6 +106,8 @@ public class GL11 extends GLEnums {
 	
 	private static Vector4f lightPos1vec;
 	private static Vector4f lightPos0vec;
+	private static Vector4f lightPos0vec0;
+	private static Vector4f lightPos1vec0;
 	
 	private static WebGLBuffer vertexBuffer;
 	private static WebGLBuffer texCoordBuffer;
@@ -1613,16 +1615,8 @@ public class GL11 extends GLEnums {
 	}
 	
 	public static void glLightf(int light, int pname, float param) {
-		if (light == GL_LIGHT0) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(param, param, param, param);
-				glFlipLightMatrix();
-			}
-		} else if (light == GL_LIGHT1) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(param, param, param, param);
-				glFlipLightMatrix();
-			}
+		if((light == GL_LIGHT0 || light == GL_LIGHT1) && pname == GL_POSITION) {
+			copyModelToLightMatrix(param, param, param, param);
 		}
 	}
 	
@@ -1633,32 +1627,16 @@ public class GL11 extends GLEnums {
 	public static void glLightfv(int light, int pname, FloatBuffer param) {
 		float[] array = new float[param.remaining()];
 		param.get(array);
-		if (light == GL_LIGHT0) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
-				glFlipLightMatrix();
-			}
-		} else if (light == GL_LIGHT1) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
-				glFlipLightMatrix();
-			}
+		if((light == GL_LIGHT0 || light == GL_LIGHT1) && pname == GL_POSITION) {
+			copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
 		}
 	}
 	
 	public static void glLightiv(int light, int pname, IntBuffer param) {
 		int[] array = new int[param.remaining()];
 		param.get(array);
-		if (light == GL_LIGHT0) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
-				glFlipLightMatrix();
-			}
-		} else if (light == GL_LIGHT1) {
-			if (pname == GL_POSITION) {
-				copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
-				glFlipLightMatrix();
-			}
+		if((light == GL_LIGHT0 || light == GL_LIGHT1) && pname == GL_POSITION) {
+			copyModelToLightMatrix(array[0], array[1], array[2], array[3]);
 		}
 	}
 	
@@ -1667,10 +1645,14 @@ public class GL11 extends GLEnums {
 			glLightiv(light, pname, (IntBuffer)param);
 		} else if(param instanceof FloatBuffer) {
 			glLightfv(light, pname, (FloatBuffer)param);
+		} else {
+			throw new IllegalArgumentException("glLight: Unsupported buffer type!");
 		}
 	}
 	
 	private static final void copyModelToLightMatrix(float par1, float par2, float par3, float par4) {
+		lightPos0vec0.set(lightPos0vec);
+		lightPos1vec0.set(lightPos1vec);
 		lightPos0vec.set(par1, par2, -par3, par4);
 		lightPos0vec.normalise();
 		lightPos1vec.set(-par1, par2, par3, par4);
@@ -1679,13 +1661,18 @@ public class GL11 extends GLEnums {
 		Matrix4f.transform(matModelV[matModelPointer], lightPos1vec, lightPos1vec).normalise();
 	}
 	
-	public static void glFlipLightMatrix() {
+	public static void glFlipLighting() {
 		lightPos0vec.x = -lightPos0vec.x;
 		lightPos1vec.x = -lightPos1vec.x;
 		lightPos0vec.y = -lightPos0vec.y;
 		lightPos1vec.y = -lightPos1vec.y;
 		lightPos0vec.z = -lightPos0vec.z;
 		lightPos1vec.z = -lightPos1vec.z;
+	}
+	
+	public static void glRevertLighting() {
+		lightPos0vec.set(lightPos0vec0);
+		lightPos1vec.set(lightPos1vec0);
 	}
 	
 	public static void glShadeModel(int shade) {
@@ -1890,6 +1877,8 @@ public class GL11 extends GLEnums {
 		
 		lightPos1vec = new Vector4f();
 		lightPos0vec = new Vector4f();
+		lightPos0vec0 = new Vector4f();
+		lightPos1vec0 = new Vector4f();
 		
 		vertexBuffer = webgl.createBuffer();
 		texCoordBuffer = webgl.createBuffer();
