@@ -6,7 +6,9 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import org.teavm.jso.JSBody;
 import org.teavm.jso.typedarrays.ArrayBuffer;
@@ -250,6 +252,22 @@ public class GL11 extends GLEnums {
 				if(d.drawMode == GL_QUADS) {
 					glBindShaders(d.mode | glGetShaderMode1());
 					glBindVertexArray0(d.array);
+					
+					for(MatrixMode m : d.matrixMode) {
+						if(m.type == 1) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().translate(matrixVector);
+						} else if(m.type == 2) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().rotate(m.angle * rad, matrixVector);
+						} else if(m.type == 3) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().scale(matrixVector);
+						} else {
+							throw new IllegalArgumentException("Unsupported matrix mode in display list");
+						}
+					}
+					
 					glDrawQuadArrays(0, d.length);
 					vertexDrawn += d.length * 6 / 4;
 					triangleDrawn += d.length / 2;
@@ -268,6 +286,22 @@ public class GL11 extends GLEnums {
 						glBufferData(WebGL2RenderingContext.ARRAY_BUFFER, blankUploadArray, WebGL2RenderingContext.DYNAMIC_DRAW);
 					}
 					glBufferSubData(WebGL2RenderingContext.ARRAY_BUFFER, 0, d.currentBuffer);
+					
+					for(MatrixMode m : d.matrixMode) {
+						if(m.type == 1) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().translate(matrixVector);
+						} else if(m.type == 2) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().rotate(m.angle * rad, matrixVector);
+						} else if(m.type == 3) {
+							matrixVector.set(m.x, m.y, m.z);
+							getMatrix().scale(matrixVector);
+						} else {
+							throw new IllegalArgumentException("Unsupported matrix mode in display list");
+						}
+					}
+					
 					int drawMode = 0;
 					switch (d.drawMode) {
 					default:
@@ -862,7 +896,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set(x, y, z);
 		getMatrix().translate(matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(1, x, y, z));
 		}
 	}
 	
@@ -870,7 +904,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set((float)x, (float)y, (float)z);
 		getMatrix().translate(matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(1, (float)x, (float)y, (float)z));
 		}
 	}
 	
@@ -880,7 +914,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set(x, y, z);
 		getMatrix().rotate(angle * rad, matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(2, angle, x, y, z));
 		}
 	}
 	
@@ -888,7 +922,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set((float)x, (float)y, (float)z);
 		getMatrix().rotate((float)angle * rad, matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(2, (float)angle, (float)x, (float)y, (float)z));
 		}
 	}
 	
@@ -896,7 +930,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set(x, y, z);
 		getMatrix().scale(matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(3, x, y, z));
 		}
 	}
 	
@@ -904,7 +938,7 @@ public class GL11 extends GLEnums {
 		matrixVector.set((float)x, (float)y, (float)x);
 		getMatrix().scale(matrixVector);
 		if (compilingDisplayList) {
-			throw new IllegalArgumentException("matrix not supported in display list");
+			currentList.matrixMode.add(new MatrixMode(3, (float)x, (float)y, (float)z));
 		}
 	}
 	
@@ -1722,6 +1756,53 @@ public class GL11 extends GLEnums {
 			this.rawBufferIndex += 7;
 		}
 
+	}
+	
+	private static class MatrixMode {
+		private int type = -1;
+		
+		private float angle;
+		private float x;
+		private float y;
+		private float z;
+		
+		private MatrixMode(int type, float x, float y, float z) {
+			this.type = type;
+			this.x = x;
+			this.y = y;
+			this.z = z;
+		}
+		
+		private MatrixMode(int type, float angle, float x, float y, float z) {
+			this.type = type;
+			this.x = x;
+			this.y = y;
+			this.z = z;
+			this.angle = angle;
+		}
+	}
+	
+	private static class DisplayList {
+		
+		private final int id;
+		private BufferArrayGL array;
+		private BufferGL buffer;
+		private int mode;
+		private int length;
+		private int drawMode = GL11.GL_QUADS;
+		private Object currentBuffer = null;
+		private int count = 0;
+		private int first = 0;
+		
+		private List<MatrixMode> matrixMode = new ArrayList<MatrixMode>();
+		
+		private DisplayList(int id) {
+			this.id = id;
+			array = null;
+			buffer = null;
+			mode = -1;
+			length = 0;
+		}
 	}
 	
 	static {
