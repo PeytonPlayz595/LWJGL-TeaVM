@@ -287,6 +287,9 @@ public class Mouse {
 	}
 	
 	public static boolean isGrabbed() {
+		if(!isPointerLocked() && isGrabbed) {
+			isGrabbed = false;
+		}
 		return isGrabbed;
 	}
 	
@@ -295,14 +298,18 @@ public class Mouse {
 		isGrabbed = grab;
 		if(isCreated()) {
 			if(grab && !grabbed) {
-				grab_x = x;
-				grab_y = y;
-				dx = 0;
-				dy = 0;
-				WebGL.canvas.requestPointerLock();
+				if(!isPointerLocked()) {
+					grab_x = x;
+					grab_y = y;
+					dx = 0;
+					dy = 0;
+					WebGL.canvas.requestPointerLock();
+				}
 			} else if (!grab && grabbed) {
-				WebGL.document.exitPointerLock();
-				setCursorPosition(grab_x, grab_y);
+				if(isPointerLocked()) {
+					WebGL.document.exitPointerLock();
+					setCursorPosition(grab_x, grab_y);
+				}
 			}
 			
 			resetMouse();
