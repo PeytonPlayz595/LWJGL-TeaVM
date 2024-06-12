@@ -9,4 +9,8 @@ public class Sys {
 	public static long getTime() {
 		return System.currentTimeMillis() & 0x7FFFFFFFFFFFFFFFL;
 	}
+	
+	public static String getVersion() {
+		return "2.9.3";
+	}
 }

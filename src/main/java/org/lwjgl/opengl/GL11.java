@@ -100,10 +100,6 @@ public class GL11 extends GLEnums {
 	
 	private static final Vector3f matrixVector;
 	
-	private static Matrix4f unprojA;
-	private static Matrix4f unprojB;
-	private static Vector4f unprojC;
-	
 	private static Vector4f lightPos1vec;
 	private static Vector4f lightPos0vec;
 	private static Vector4f lightPos0vec0;
@@ -855,6 +851,13 @@ public class GL11 extends GLEnums {
 		}
 	}
 	
+	private static final Matrix4f paramMatrix = new Matrix4f();
+	public static final void glMultMatrix(FloatBuffer matrix) {
+		Matrix4f modeMatrix = getMatrix();
+		paramMatrix.load(matrix);
+		Matrix4f.mul(modeMatrix, paramMatrix, modeMatrix);
+	}
+	
 	public static final void glLoadIdentity() {
 		getMatrix().setIdentity();
 	}
@@ -1409,61 +1412,6 @@ public class GL11 extends GLEnums {
 	public static final void glDeleteBuffer(BufferGL p1) {
 		webgl.deleteBuffer(p1.obj);
 	}
-
-	public static final void gluUnProject(float p1, float p2, float p3, FloatBuffer p4, FloatBuffer p5, int[] p6, FloatBuffer p7) {
-		unprojA.load(p4);
-		unprojB.load(p5);
-		Matrix4f.mul(unprojA, unprojB, unprojB);
-		unprojB.invert();
-		unprojC.set(((p1 - (float) p6[0]) / (float) p6[2]) * 2f - 1f, ((p2 - (float) p6[1]) / (float) p6[3]) * 2f - 1f,
-				p3, 1.0f);
-		Matrix4f.transform(unprojB, unprojC, unprojC);
-		p7.put(unprojC.x / unprojC.w);
-		p7.put(unprojC.y / unprojC.w);
-		p7.put(unprojC.z / unprojC.w);
-	}
-
-	public static final void gluPerspective(float fovy, float aspect, float zNear, float zFar) {
-		Matrix4f res = getMatrix();
-		float cotangent = (float) Math.cos(fovy * rad * 0.5f) / (float) Math.sin(fovy * rad * 0.5f);
-		res.m00 = cotangent / aspect;
-		res.m01 = 0.0f;
-		res.m02 = 0.0f;
-		res.m03 = 0.0f;
-		res.m10 = 0.0f;
-		res.m11 = cotangent;
-		res.m12 = 0.0f;
-		res.m13 = 0.0f;
-		res.m20 = 0.0f;
-		res.m21 = 0.0f;
-		res.m22 = (zFar + zNear) / (zFar - zNear);
-		res.m23 = -1.0f;
-		res.m30 = 0.0f;
-		res.m31 = 0.0f;
-		res.m32 = 2.0f * zFar * zNear / (zFar - zNear);
-		res.m33 = 0.0f;
-	}
-
-	public static final void gluPerspectiveFlat(float fovy, float aspect, float zNear, float zFar) {
-		Matrix4f res = getMatrix();
-		float cotangent = (float) Math.cos(fovy * rad * 0.5f) / (float) Math.sin(fovy * rad * 0.5f);
-		res.m00 = cotangent / aspect;
-		res.m01 = 0.0f;
-		res.m02 = 0.0f;
-		res.m03 = 0.0f;
-		res.m10 = 0.0f;
-		res.m11 = cotangent;
-		res.m12 = 0.0f;
-		res.m13 = 0.0f;
-		res.m20 = 0.0f;
-		res.m21 = 0.0f;
-		res.m22 = ((zFar + zNear) / (zFar - zNear)) * 0.001f;
-		res.m23 = -1.0f;
-		res.m30 = 0.0f;
-		res.m31 = 0.0f;
-		res.m32 = 2.0f * zFar * zNear / (zFar - zNear);
-		res.m33 = 0.0f;
-	}
 	
 	public static final void glGetInteger(int pname, int[] param) {
 		if(pname == GL_VIEWPORT) {
@@ -1486,23 +1434,6 @@ public class GL11 extends GLEnums {
 		viewportCache[2] = width;
 		viewportCache[3] = height;
 		webgl.viewport(x, y, width, height);
-	}
-	
-	public static final String gluErrorString(int p1) {
-		switch (p1) {
-		case GL_INVALID_ENUM:
-			return "GL_INVALID_ENUM";
-		case GL_INVALID_VALUE:
-			return "GL_INVALID_VALUE";
-		case GL_INVALID_OPERATION:
-			return "GL_INVALID_OPERATION";
-		case GL_OUT_OF_MEMORY:
-			return "GL_OUT_OF_MEMORY";
-		case GL_CONTEXT_LOST_WEBGL:
-			return "CONTEXT_LOST_WEBGL";
-		default:
-			return "Unknown Error";
-		}
 	}
 	
 	public static final int glGetError() {
@@ -1875,10 +1806,6 @@ public class GL11 extends GLEnums {
 		}
 		
 		matrixVector = new Vector3f();
-		
-		unprojA = new Matrix4f();
-		unprojB = new Matrix4f();
-		unprojC = new Vector4f();
 		
 		lightPos1vec = new Vector4f();
 		lightPos0vec = new Vector4f();
